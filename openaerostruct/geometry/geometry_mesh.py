@@ -14,6 +14,7 @@ from openaerostruct.geometry.geometry_mesh_transformations import (
     Dihedral,
     ShearZ,
     Rotate,
+    Angles,
 )
 
 
@@ -156,6 +157,18 @@ class GeometryMesh(om.Group):
 
         self.add_subsystem("shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
 
+        if "angles" in surface:
+            promotes = ["angles"]
+        else:
+            val = np.zeros(ny)
+            promotes = []
+
+        self.add_subsystem(
+            "angles",
+            Angles(mesh_shape=mesh_shape),
+            promotes_inputs=promotes
+        )
+
         # 9. Rotate
 
         val = np.zeros(ny)
@@ -172,7 +185,7 @@ class GeometryMesh(om.Group):
             promotes_outputs=["mesh"],
         )
 
-        names = ["taper", "scale_x", "sweep", "shear_x", "stretch", "shear_y", "dihedral", "shear_z", "rotate"]
+        names = ["taper", "scale_x", "sweep", "shear_x", "stretch", "shear_y", "dihedral", "shear_z", "angles", "rotate"]
 
         for j in np.arange(len(names) - 1):
             self.connect(names[j] + ".mesh", names[j + 1] + ".in_mesh")

@@ -183,6 +183,10 @@ class Geometry(om.Group):
                 if surface.get("taper_dv", True):
                     self.set_input_defaults("taper", val=surface["taper"])
 
+            if "angles" in surface.keys():
+                bsp_inputs.append("angles")
+                self.set_input_defaults("angles", val=surface["angles"])
+
             self.add_subsystem(
                 "mesh", GeometryMesh(surface=surface), promotes_inputs=bsp_inputs, promotes_outputs=["mesh"]
             )

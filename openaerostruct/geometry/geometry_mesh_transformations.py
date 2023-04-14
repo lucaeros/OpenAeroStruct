@@ -2,10 +2,68 @@
     based on high-level design parameters. """
 
 import numpy as np
-
+import jax.numpy as jnp
+from jax import grad, jacfwd, jacrev
+from jax.config import config
+config.update("jax_enable_x64", True)
 import openmdao.api as om
 
+def apply_angles(mesh, angles, mesh_shape):
+	te = mesh.at[-1].get()
+	le = mesh.at[0].get()
+	s0 = mesh_shape[0]
+	s1 = mesh_shape[1]
+	quarter_chord = 0.25 * te + 0.75 * le
+	vect = quarter_chord.at[:-1, :].get() - quarter_chord.at[1:, :].get()
+	#points = jnp.array([[mesh.at[i,j,:].get()-quarter_chord.at[j,:].get() for j in range(s1-1)] for i in range(s0)])
+	new_quarters = jnp.zeros(quarter_chord.shape)
+	new_quarters = new_quarters.at[s1-1, :].set(quarter_chord.at[s1-1, :].get())
+	#norms = jnp.array([jnp.sqrt(vect.at[j, 1].get()**2+vect.at[j,2].get()**2) for j in range(s1-1)])
+	new_mesh = jnp.zeros(mesh_shape)
+	new_mesh = new_mesh.at[:,-1,:].set(mesh.at[:,-1,:].get())
+	for j in reversed(range(s1-1)):
+		norms = jnp.sqrt(vect.at[j, 1].get()**2+vect.at[j,2].get()**2)
+		for i in range(s0):
+			points = mesh.at[i,j,:].get()-quarter_chord.at[j,:].get()
+			new_quarters = new_quarters.at[j, :].set(new_quarters.at[j+1, :].get() + jnp.array([vect.at[j,0].get(),norms*jnp.cos(angles.at[j].get()*np.pi/180), norms*jnp.sin(angles.at[j].get()*np.pi/180)]))
+			new_mesh = new_mesh.at[i, j,:].set(new_quarters.at[j,:].get()+points)
+	return new_mesh
 
+
+class Angles(om.ExplicitComponent):
+    def initialize(self):
+        """
+        Declare options.
+        """
+        #self.options.declare("mesh")
+        self.options.declare("mesh_shape", desc="mesh")
+
+    def setup(self):
+        mesh_shape = self.options["mesh_shape"]
+        self.add_input("in_mesh", val = np.zeros(mesh_shape))
+        self.add_input("angles", val = np.zeros(mesh_shape[1]-1))
+        self.add_output("mesh", val= np.zeros(mesh_shape))
+        self.declare_partials(of = "mesh", wrt = "in_mesh")
+        self.declare_partials(of = "mesh", wrt = "angles")
+
+    def compute(self, inputs, outputs):
+        in_mesh = jnp.array(inputs["in_mesh"])
+        angles = jnp.array(inputs["angles"])
+        mesh_shape = self.options["mesh_shape"]
+        outputs["mesh"] = apply_angles(in_mesh,angles, mesh_shape)
+
+    def compute_partials(self, inputs, J):
+        in_mesh = jnp.array(inputs["in_mesh"])
+        print("INPUT MESH IS : ", in_mesh)
+        angles = jnp.array(inputs["angles"])
+        mesh_shape = jnp.array(self.options["mesh_shape"])
+        p = np.prod(mesh_shape)
+        J1 = jacfwd(apply_angles, 0)(in_mesh, angles, mesh_shape)
+        J2 = jacfwd(apply_angles, 1)(in_mesh, angles, mesh_shape)
+        J["mesh","in_mesh"] = J1.reshape((p,p))
+        J["mesh","angles"] = J2.reshape((p,mesh_shape[1]-1))
+
+        
 class Taper(om.ExplicitComponent):
     """
     OpenMDAO component that manipulates the mesh by altering the spanwise chord linearly to produce
