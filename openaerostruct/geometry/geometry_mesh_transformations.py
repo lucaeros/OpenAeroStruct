@@ -54,7 +54,6 @@ class Angles(om.ExplicitComponent):
 
     def compute_partials(self, inputs, J):
         in_mesh = jnp.array(inputs["in_mesh"])
-        print("INPUT MESH IS : ", in_mesh)
         angles = jnp.array(inputs["angles"])
         mesh_shape = jnp.array(self.options["mesh_shape"])
         p = np.prod(mesh_shape)
@@ -63,7 +62,7 @@ class Angles(om.ExplicitComponent):
         J["mesh","in_mesh"] = J1.reshape((p,p))
         J["mesh","angles"] = J2.reshape((p,mesh_shape[1]-1))
 
-        
+
 class Taper(om.ExplicitComponent):
     """
     OpenMDAO component that manipulates the mesh by altering the spanwise chord linearly to produce
