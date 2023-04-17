@@ -15,6 +15,7 @@ from openaerostruct.geometry.geometry_mesh_transformations import (
     ShearZ,
     Rotate,
     Angles,
+    measure_angles,
 )
 
 
@@ -173,12 +174,11 @@ class GeometryMesh(om.Group):
         if "angles" in surface:
             promotes = ["angles"]
         else:
-            val = np.zeros(ny)
             promotes = []
-
+        val = measure_angles(mesh) 
         self.add_subsystem(
             "angles",
-            Angles(mesh_shape=mesh_shape),
+            Angles(mesh_shape=mesh_shape, val = val),
             promotes_inputs=promotes
         )
 

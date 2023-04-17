@@ -8,6 +8,18 @@ from jax.config import config
 config.update("jax_enable_x64", True)
 import openmdao.api as om
 
+
+def measure_angles(mesh):
+    te = mesh[-1]
+    le = mesh[0]
+    quarter_chord = 0.25 * te + 0.75 * le
+    dz_qc = quarter_chord[:-1, 2]-quarter_chord[1:, 2]
+    dy_qc = quarter_chord[:-1, 1]-quarter_chord[1:, 1]
+    theta_x = np.arctan(dz_qc / dy_qc)*180/np.pi
+    # Prepend with 0 so that root is not rotated
+    return theta_x
+
+
 def apply_angles(mesh, angles, mesh_shape):
 	te = mesh.at[-1].get()
 	le = mesh.at[0].get()
@@ -37,11 +49,13 @@ class Angles(om.ExplicitComponent):
         """
         #self.options.declare("mesh")
         self.options.declare("mesh_shape", desc="mesh")
+        self.options.declare("val", desc="Initial value for angles dihedral")
 
     def setup(self):
         mesh_shape = self.options["mesh_shape"]
+        val = self.options["val"]
         self.add_input("in_mesh", val = np.zeros(mesh_shape))
-        self.add_input("angles", val = np.zeros(mesh_shape[1]-1))
+        self.add_input("angles", val = val)
         self.add_output("mesh", val= np.zeros(mesh_shape))
         self.declare_partials(of = "mesh", wrt = "in_mesh")
         self.declare_partials(of = "mesh", wrt = "angles")
