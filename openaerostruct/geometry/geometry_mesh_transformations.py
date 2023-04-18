@@ -1,6 +1,7 @@
 """ A set of components that manipulate geometry mesh
     based on high-level design parameters. """
 
+from re import S
 import numpy as np
 import jax.numpy as jnp
 from jax import grad, jacfwd, jacrev
@@ -20,7 +21,8 @@ def measure_angles(mesh):
     return theta_x
 
 
-def apply_angles(mesh, angles, mesh_shape):
+
+def apply_angles_baseline(mesh, angles, mesh_shape):
 	te = mesh.at[-1].get()
 	le = mesh.at[0].get()
 	s0 = mesh_shape[0]
@@ -40,6 +42,37 @@ def apply_angles(mesh, angles, mesh_shape):
 			new_quarters = new_quarters.at[j, :].set(new_quarters.at[j+1, :].get() + jnp.array([vect.at[j,0].get(),norms*jnp.cos(angles.at[j].get()*np.pi/180), norms*jnp.sin(angles.at[j].get()*np.pi/180)]))
 			new_mesh = new_mesh.at[i, j,:].set(new_quarters.at[j,:].get()+points)
 	return new_mesh
+
+def apply_angles(mesh, angles, mesh_shape):
+	xsection = jnp.array([1,0,0])
+	te = mesh.at[-1].get()
+	le = mesh.at[0].get()
+	s0 = mesh_shape[0]
+	s1 = mesh_shape[1]
+	quarter_chord = 0.25 * te + 0.75 * le
+	vect = quarter_chord.at[:-1, :].get() - quarter_chord.at[1:, :].get()
+	#points = jnp.array([[mesh.at[i,j,:].get()-quarter_chord.at[j,:].get() for j in range(s1-1)] for i in range(s0)])
+	new_quarters = jnp.zeros(quarter_chord.shape)
+	new_quarters = new_quarters.at[s1-1, :].set(quarter_chord.at[s1-1, :].get())
+	#norms = jnp.array([jnp.sqrt(vect.at[j, 1].get()**2+vect.at[j,2].get()**2) for j in range(s1-1)])
+	new_mesh = jnp.zeros(mesh_shape)
+	new_mesh = new_mesh.at[:,-1,:].set(mesh.at[:,-1,:].get())
+	for j in reversed(range(s1-1)):
+		norms = jnp.sqrt(vect.at[j, 1].get()**2+vect.at[j,2].get()**2)
+		new_quarters = new_quarters.at[j, :].set(new_quarters.at[j+1, :].get() + jnp.array([vect.at[j,0].get(),norms*jnp.cos(angles.at[j].get()*np.pi/180), norms*jnp.sin(angles.at[j].get()*np.pi/180)]))
+		newvect = new_quarters.at[j, :].get() - new_quarters.at[j+1, :].get()
+		ysection = vect.at[j].get()/jnp.linalg.norm(vect.at[j].get())
+		zsection = jnp.cross(ysection, xsection)
+		newysection = newvect/jnp.linalg.norm(newvect)
+		newzsection = jnp.cross(newysection, xsection)
+		for i in range(s0):
+			points = mesh.at[i,j,:].get()-quarter_chord.at[j,:].get()
+			x = jnp.dot(points, xsection)
+			z = jnp.dot(points, zsection)
+			new_mesh = new_mesh.at[i, j,:].set(new_quarters.at[j,:].get()+x*xsection + z*newzsection)
+	return new_mesh
+
+
 
 
 class Angles(om.ExplicitComponent):
