@@ -158,8 +158,14 @@ class GeometryMesh(om.Group):
 
         self.add_subsystem("shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
 
+        if "angles" in surface:
+            if len(surface["angles"])==0:
+                val = measure_angles(mesh)
+            else :
+                val = surface["angles"]
+        else :
+            val = measure_angles(mesh) 
         promotes = ["angles"]
-        val = measure_angles(mesh) 
         self.add_subsystem(
             "angles",
             Angles(mesh_shape=mesh_shape, val = val),
