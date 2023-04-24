@@ -1,9 +1,10 @@
 import numpy as np
 
 import openmdao.api as om
+"""
 from openaerostruct.geometry.geometry_mesh_transformations import (
     measure_angles,
-)
+)"""
 
 
 class Geometry(om.Group):
@@ -185,14 +186,14 @@ class Geometry(om.Group):
                 bsp_inputs.append("taper")
                 if surface.get("taper_dv", True):
                     self.set_input_defaults("taper", val=surface["taper"])
-
+            """
             if "angles" in surface.keys():
                 bsp_inputs.append("angles")
                 if len(surface["angles"])==0:
                     self.set_input_defaults("angles", val=measure_angles(surface["mesh"]))
                 else :
                     self.set_input_defaults("angles", val=surface["angles"])
-
+            """
 
 
             self.add_subsystem(
