@@ -1000,7 +1000,7 @@ class Rotate(om.ExplicitComponent):
         rotate_x = self.options["rotate_x"]
         theta_y = inputs["twist"]
         mesh = inputs["in_mesh"]
-
+        
         te = mesh[-1]
         le = mesh[0]
         quarter_chord = 0.25 * te + 0.75 * le
@@ -1056,7 +1056,7 @@ class Rotate(om.ExplicitComponent):
         rotate_x = self.options["rotate_x"]
         theta_y = inputs["twist"]
         mesh = inputs["in_mesh"]
-
+        
         te = mesh[-1]
         le = mesh[0]
         quarter_chord = 0.25 * te + 0.75 * le

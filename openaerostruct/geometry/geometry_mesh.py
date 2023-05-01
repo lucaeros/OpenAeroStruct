@@ -157,22 +157,32 @@ class GeometryMesh(om.Group):
             promotes = []
 
         self.add_subsystem("shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
-        
-        if "angles" in surface:
+        """if "angles_cp" in surface:
             promotes = ["angles"]
-            if len(surface["angles"])==0:
+            if len(surface["angles_cp"])==0:
                 val = measure_angles(mesh)
             else :
-                val = surface["angles"]
+                val = np.zeros(ny-1)
         else :
             val = measure_angles(mesh) 
+        print(len(val))
+        self.add_subsystem(
+            "angles",
+            Angles(mesh_shape=mesh_shape, val = val),
+            promotes_inputs=promotes
+        )"""
+        val = np.zeros(ny-1)
+        if "angles_cp" in surface:
+            promotes = ["angles"]
+            #val = measure_angles(mesh)
+        else :
+            promotes = []
+                
         self.add_subsystem(
             "angles",
             Angles(mesh_shape=mesh_shape, val = val),
             promotes_inputs=promotes
         )
-        
-       
         # 9. Rotate
 
         val = np.zeros(ny)
@@ -189,8 +199,8 @@ class GeometryMesh(om.Group):
             promotes_outputs=["mesh"],
         )
 
-        names = ["taper", "scale_x", "sweep", "shear_x", "stretch", "shear_y", "dihedral", "shear_z","angles", "rotate"]
-        #names = ["taper", "scale_x", "sweep", "shear_x", "stretch", "shear_y", "dihedral", "shear_z", "rotate"]
+        #names = ["taper", "scale_x", "sweep", "shear_x", "stretch", "shear_y", "dihedral", "shear_z","angles", "rotate"]
+        names = ["taper", "scale_x", "sweep", "shear_x", "stretch", "shear_y", "dihedral", "shear_z", "rotate"]
 
         for j in np.arange(len(names) - 1):
             self.connect(names[j] + ".mesh", names[j + 1] + ".in_mesh")

@@ -186,14 +186,28 @@ class Geometry(om.Group):
                 bsp_inputs.append("taper")
                 if surface.get("taper_dv", True):
                     self.set_input_defaults("taper", val=surface["taper"])
-            
+            """
             if "angles" in surface.keys():
                 bsp_inputs.append("angles")
                 if len(surface["angles"])==0:
                     self.set_input_defaults("angles", val=measure_angles(surface["mesh"]))
                 else :
                     self.set_input_defaults("angles", val=surface["angles"])
-            
+            """
+            if "angles_cp" in surface.keys():
+                n_cp = len(surface["angles_cp"])
+                # Add bspline components for active bspline geometric variables.
+                x_interp = np.linspace(0.0, 1.0, int(ny-1))
+                comp = self.add_subsystem(
+                    "angles_bsp",
+                    om.SplineComp(
+                        method="bsplines", x_interp_val=x_interp, num_cp=n_cp, interp_options={"order": min(n_cp, 4)}
+                    ),
+                    promotes_inputs=["angles_cp"],
+                    promotes_outputs=["angles"],
+                )
+                comp.add_spline(y_cp_name="angles_cp", y_interp_name="angles", y_units="deg")
+                bsp_inputs.append("angles")
 
 
             self.add_subsystem(
