@@ -4,6 +4,7 @@ import openmdao.api as om
 
 from openaerostruct.geometry.geometry_mesh_transformations import (
     measure_angles,
+    DiffTwist,
 )
 
 
@@ -63,7 +64,28 @@ class Geometry(om.Group):
             from openaerostruct.geometry.geometry_mesh import GeometryMesh
 
             bsp_inputs = []
+            if "dtwist_cp" in surface.keys():
+                n_cp = len(surface["dtwist_cp"])
+                self.add_subsystem("dtwist_bsp",DiffTwist(N = n_cp),
+                    promotes_inputs=["dtwist_cp"],
+                    promotes_outputs=["twist_cp"],
+                )
+                # Add bspline components for active bspline geometric variables.
+                x_interp = np.linspace(0.0, 1.0, int(ny))
+                comp = self.add_subsystem(
+                    "twist_bsp",
+                    om.SplineComp(
+                        method="bsplines", x_interp_val=x_interp, num_cp=n_cp, interp_options={"order": min(n_cp, 4)}
+                    ),
+                    promotes_inputs=["twist_cp"],
+                    promotes_outputs=["twist"],
+                )
+                comp.add_spline(y_cp_name="twist_cp", y_interp_name="twist", y_units="deg")
+                bsp_inputs.append("twist")
+                if surface.get("dtwist_cp_dv", True):
+                    self.set_input_defaults("dtwist_cp", val=surface["dtwist_cp"], units="deg")
 
+            
             if "twist_cp" in surface.keys():
                 n_cp = len(surface["twist_cp"])
                 # Add bspline components for active bspline geometric variables.
@@ -82,7 +104,7 @@ class Geometry(om.Group):
                 # Since default assumption is that we want tail rotation as a design variable, add this to allow for trimmed drag polar where the tail rotation should not be a design variable
                 if surface.get("twist_cp_dv", True):
                     self.set_input_defaults("twist_cp", val=surface["twist_cp"], units="deg")
-
+            
             if "chord_cp" in surface.keys():
                 n_cp = len(surface["chord_cp"])
                 # Add bspline components for active bspline geometric variables.

@@ -72,7 +72,30 @@ def apply_angles(mesh, angles, mesh_shape):
 			new_mesh = new_mesh.at[i, j,:].set(new_quarters.at[j,:].get()+x*xsection + z*newzsection)
 	return new_mesh
 
+class DiffTwist(om.ExplicitComponent):
+    def initialize(self):
+        """
+        Declare options.
+        """
+        self.options.declare("N", desc="number of value for twist")
 
+    def setup(self):
+        N = self.options["N"]
+        self.N = N
+        self.add_input("dtwist_cp", val = np.zeros(N))
+        self.add_output("twist_cp", val = np.zeros(N))
+        self.declare_partials(of = "twist_cp", wrt = "dtwist_cp")
+
+    def compute(self, inputs, outputs):
+        outputs["twist_cp"][-1] = inputs["dtwist_cp"][-1]
+        for k in range(1, self.N):
+            outputs["twist_cp"][-1-k] = inputs["dtwist_cp"][-k] + inputs["dtwist_cp"][-k-1]
+
+    def compute_partials(self, inputs, J):
+        J["twist_cp", "dtwist_cp"][-1, -1] = 1
+        for k in range(1, self.N):
+            J["twist_cp", "dtwist_cp"][-1-k, -k] = 1
+            J["twist_cp", "dtwist_cp"][-1-k, -k-1] = 1
 
 
 class Angles(om.ExplicitComponent):
