@@ -233,8 +233,97 @@ class Taper(om.ExplicitComponent):
 
         partials["mesh", "taper"] = np.einsum("ijk, j->ijk", mesh - quarter_chord, dtaper)
 
-
 class ScaleX(om.ExplicitComponent):
+    """
+    OpenMDAO component that manipulates the mesh by modifying the chords along the span of the
+    wing by scaling only the x-coord.
+
+    Parameters
+    ----------
+    mesh[nx, ny, 3] : numpy array
+        Nodal mesh defining the initial aerodynamic surface.
+    chord[ny] : numpy array
+        Chord length for each panel edge.
+
+    Returns
+    -------
+    mesh[nx, ny, 3] : numpy array
+        Nodal mesh with the new chord lengths.
+    """
+
+    def initialize(self):
+        """
+        Declare options.
+        """
+        self.options.declare("val", desc="Initial value for chord lengths")
+        self.options.declare("mesh_shape", desc="Tuple containing mesh shape (nx, ny).")
+
+    def setup(self):
+        mesh_shape = self.options["mesh_shape"]
+        val = self.options["val"]
+
+        self.add_input("chord", units="m", val=val)
+        self.add_input("in_mesh", shape=mesh_shape, units="m")
+
+        self.add_output("mesh", shape=mesh_shape, units="m")
+
+        nx, ny, _ = mesh_shape
+        nn = nx * ny * 3
+
+        rows = np.arange(nn)
+        col = np.tile(np.zeros(3), ny) + np.repeat(np.arange(ny), 3)
+        cols = np.tile(col, nx)
+
+        self.declare_partials("mesh", "chord", rows=rows, cols=cols)
+
+        p_rows = np.arange(nn)
+        te_rows = np.arange(((nx - 1) * ny * 3))
+        le_rows = te_rows + ny * 3
+        le_cols = np.tile(np.arange(3 * ny), nx - 1)
+        te_cols = le_cols + ny * 3 * (nx - 1)
+        rows = np.concatenate([p_rows, te_rows, le_rows])
+        cols = np.concatenate([p_rows, te_cols, le_cols])
+
+        self.declare_partials("mesh", "in_mesh", rows=rows, cols=cols)
+
+    def compute(self, inputs, outputs):
+        alpha = 1.0
+        mesh = inputs["in_mesh"]
+        chord_dist = inputs["chord"]
+
+        te = mesh[-1]
+        le = mesh[0]
+        quarter_chord = alpha * te + (1-alpha) * le
+
+        outputs["mesh"] = np.einsum("ijk,j->ijk", mesh - quarter_chord, chord_dist) + quarter_chord
+
+    def compute_partials(self, inputs, partials):
+        alpha = 1.0
+        mesh = inputs["in_mesh"]
+        chord_dist = inputs["chord"]
+
+        te = mesh[-1]
+        le = mesh[0]
+        quarter_chord = alpha * te + (1-alpha) * le
+
+        partials["mesh", "chord"] = (mesh - quarter_chord).flatten()
+
+        nx, ny, _ = mesh.shape
+        nn = nx * ny * 3
+        d_mesh = np.einsum("i,ij->ij", chord_dist, np.ones((ny, 3))).flatten()
+        partials["mesh", "in_mesh"][:nn] = np.tile(d_mesh, nx)
+
+        d_qc = (np.einsum("ij,i->ij", np.ones((ny, 3)), 1.0 - chord_dist)).flatten()
+        nnq = (nx - 1) * ny * 3
+        partials["mesh", "in_mesh"][nn : nn + nnq] = np.tile(alpha * d_qc, nx - 1)
+        partials["mesh", "in_mesh"][nn + nnq :] = np.tile((1-alpha) * d_qc, nx - 1)
+
+        nnq = ny * 3
+        partials["mesh", "in_mesh"][nn - nnq : nn] += alpha * d_qc
+        partials["mesh", "in_mesh"][:nnq] += (1-alpha) * d_qc
+
+
+class ScaleXold(om.ExplicitComponent):
     """
     OpenMDAO component that manipulates the mesh by modifying the chords along the span of the
     wing by scaling only the x-coord.
