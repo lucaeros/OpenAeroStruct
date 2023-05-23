@@ -233,6 +233,7 @@ class Taper(om.ExplicitComponent):
 
         partials["mesh", "taper"] = np.einsum("ijk, j->ijk", mesh - quarter_chord, dtaper)
 
+
 class ScaleX(om.ExplicitComponent):
     """
     OpenMDAO component that manipulates the mesh by modifying the chords along the span of the
@@ -287,7 +288,7 @@ class ScaleX(om.ExplicitComponent):
         self.declare_partials("mesh", "in_mesh", rows=rows, cols=cols)
 
     def compute(self, inputs, outputs):
-        alpha = 1.0
+        alpha = 0.7
         mesh = inputs["in_mesh"]
         chord_dist = inputs["chord"]
 
@@ -298,7 +299,7 @@ class ScaleX(om.ExplicitComponent):
         outputs["mesh"] = np.einsum("ijk,j->ijk", mesh - quarter_chord, chord_dist) + quarter_chord
 
     def compute_partials(self, inputs, partials):
-        alpha = 1.0
+        alpha = 0.7
         mesh = inputs["in_mesh"]
         chord_dist = inputs["chord"]
 
