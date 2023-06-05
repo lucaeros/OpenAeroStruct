@@ -6,6 +6,7 @@ import numpy as np
 import jax.numpy as jnp
 from jax import grad, jacfwd, jacrev
 from jax.config import config
+
 config.update("jax_enable_x64", True)
 import openmdao.api as om
 
@@ -14,63 +15,87 @@ def measure_angles(mesh):
     te = mesh[-1]
     le = mesh[0]
     quarter_chord = 0.25 * te + 0.75 * le
-    dz_qc = quarter_chord[:-1, 2]-quarter_chord[1:, 2]
-    dy_qc = quarter_chord[:-1, 1]-quarter_chord[1:, 1]
-    theta_x = np.arctan(dz_qc / dy_qc)*180/np.pi
+    dz_qc = quarter_chord[:-1, 2] - quarter_chord[1:, 2]
+    dy_qc = quarter_chord[:-1, 1] - quarter_chord[1:, 1]
+    theta_x = np.arctan(dz_qc / dy_qc) * 180 / np.pi
     # Prepend with 0 so that root is not rotated
     return theta_x
 
 
-
-def apply_angles_baseline(mesh, angles, mesh_shape):
-	te = mesh.at[-1].get()
-	le = mesh.at[0].get()
-	s0 = mesh_shape[0]
-	s1 = mesh_shape[1]
-	quarter_chord = 0.25 * te + 0.75 * le
-	vect = quarter_chord.at[:-1, :].get() - quarter_chord.at[1:, :].get()
-	#points = jnp.array([[mesh.at[i,j,:].get()-quarter_chord.at[j,:].get() for j in range(s1-1)] for i in range(s0)])
-	new_quarters = jnp.zeros(quarter_chord.shape)
-	new_quarters = new_quarters.at[s1-1, :].set(quarter_chord.at[s1-1, :].get())
-	#norms = jnp.array([jnp.sqrt(vect.at[j, 1].get()**2+vect.at[j,2].get()**2) for j in range(s1-1)])
-	new_mesh = jnp.zeros(mesh_shape)
-	new_mesh = new_mesh.at[:,-1,:].set(mesh.at[:,-1,:].get())
-	for j in reversed(range(s1-1)):
-		norms = jnp.sqrt(vect.at[j, 1].get()**2+vect.at[j,2].get()**2)
-		for i in range(s0):
-			points = mesh.at[i,j,:].get()-quarter_chord.at[j,:].get()
-			new_quarters = new_quarters.at[j, :].set(new_quarters.at[j+1, :].get() + jnp.array([vect.at[j,0].get(),norms*jnp.cos(angles.at[j].get()*np.pi/180), norms*jnp.sin(angles.at[j].get()*np.pi/180)]))
-			new_mesh = new_mesh.at[i, j,:].set(new_quarters.at[j,:].get()+points)
-	return new_mesh
-
 def apply_angles(mesh, angles, mesh_shape):
-	xsection = jnp.array([1,0,0])
-	te = mesh.at[-1].get()
-	le = mesh.at[0].get()
-	s0 = mesh_shape[0]
-	s1 = mesh_shape[1]
-	quarter_chord = 0.25 * te + 0.75 * le
-	vect = quarter_chord.at[:-1, :].get() - quarter_chord.at[1:, :].get()
-	#points = jnp.array([[mesh.at[i,j,:].get()-quarter_chord.at[j,:].get() for j in range(s1-1)] for i in range(s0)])
-	new_quarters = jnp.zeros(quarter_chord.shape)
-	new_quarters = new_quarters.at[s1-1, :].set(quarter_chord.at[s1-1, :].get())
-	#norms = jnp.array([jnp.sqrt(vect.at[j, 1].get()**2+vect.at[j,2].get()**2) for j in range(s1-1)])
-	new_mesh = jnp.zeros(mesh_shape)
-	new_mesh = new_mesh.at[:,-1,:].set(mesh.at[:,-1,:].get())
-	for j in reversed(range(s1-1)):
-		norms = jnp.sqrt(vect.at[j, 1].get()**2+vect.at[j,2].get()**2)
-		new_quarters = new_quarters.at[j, :].set(new_quarters.at[j+1, :].get() + jnp.array([vect.at[j,0].get(),norms*jnp.cos(angles.at[j].get()*np.pi/180), norms*jnp.sin(angles.at[j].get()*np.pi/180)]))
-		newvect = new_quarters.at[j, :].get() - new_quarters.at[j+1, :].get()
-		ysection = vect.at[j].get()/jnp.linalg.norm(vect.at[j].get())
-		zsection = jnp.cross(ysection, xsection)
-		newysection = newvect/jnp.linalg.norm(newvect)
-		newzsection = jnp.cross(newysection, xsection)
-		for i in range(s0):
-			points = mesh.at[i,j,:].get()-quarter_chord.at[j,:].get()
-			x = jnp.dot(points, xsection)
-			z = jnp.dot(points, zsection)
-			new_mesh = new_mesh.at[i, j,:].set(new_quarters.at[j,:].get()+x*xsection + z*newzsection)
-	return new_mesh
+    xsection = jnp.array([1, 0, 0])
+    te = mesh[-1]
+    le = mesh[0]
+    s0 = mesh_shape[0]
+    s1 = mesh_shape[1]
+    quarter_chord = 0.25 * te + 0.75 * le
+    vect = quarter_chord[:-1, :] - quarter_chord[1:, :]
+    new_quarters = jnp.zeros(quarter_chord.shape)
+    new_quarters = new_quarters.at[s1 - 1, :].set(quarter_chord[s1 - 1, :])
+    new_mesh = jnp.zeros(mesh_shape)
+    new_mesh = new_mesh.at[:, -1, :].set(mesh[:, -1, :])
+    for j in reversed(range(s1 - 1)):
+        norms = jnp.sqrt(vect.at[j, 1].get() ** 2 + vect.at[j, 2].get() ** 2)
+        new_quarters = new_quarters.at[j, :].set(
+            new_quarters[j + 1, :]
+            + jnp.array(
+                [
+                    vect[j, 0],
+                    norms * jnp.cos(angles[j] * np.pi / 180),
+                    norms * jnp.sin(angles[j] * np.pi / 180),
+                ]
+            )
+        )
+        newvect = new_quarters[j, :] - new_quarters[j + 1, :]
+        ysection = vect[j] / jnp.linalg.norm(vect[j])
+        zsection = jnp.cross(ysection, xsection)
+        newysection = newvect / jnp.linalg.norm(newvect)
+        newzsection = jnp.cross(newysection, xsection)
+        for i in range(s0):
+            points = mesh[i, j, :] - quarter_chord[j, :]
+            z = jnp.dot(points, zsection)
+            new_mesh = new_mesh.at[i, j, :].set(new_quarters[j, :] + points[0] * xsection + z * newzsection)
+    return new_mesh
+
+
+def apply_angles_old(mesh, angles, mesh_shape):
+    xsection = jnp.array([1, 0, 0])
+    te = mesh.at[-1].get()
+    le = mesh.at[0].get()
+    s0 = mesh_shape[0]
+    s1 = mesh_shape[1]
+    quarter_chord = 0.25 * te + 0.75 * le
+    vect = quarter_chord.at[:-1, :].get() - quarter_chord.at[1:, :].get()
+    # points = jnp.array([[mesh.at[i,j,:].get()-quarter_chord.at[j,:].get() for j in range(s1-1)] for i in range(s0)])
+    new_quarters = jnp.zeros(quarter_chord.shape)
+    new_quarters = new_quarters.at[s1 - 1, :].set(quarter_chord.at[s1 - 1, :].get())
+    # norms = jnp.array([jnp.sqrt(vect.at[j, 1].get()**2+vect.at[j,2].get()**2) for j in range(s1-1)])
+    new_mesh = jnp.zeros(mesh_shape)
+    new_mesh = new_mesh.at[:, -1, :].set(mesh.at[:, -1, :].get())
+    for j in reversed(range(s1 - 1)):
+        norms = jnp.sqrt(vect.at[j, 1].get() ** 2 + vect.at[j, 2].get() ** 2)
+        new_quarters = new_quarters.at[j, :].set(
+            new_quarters.at[j + 1, :].get()
+            + jnp.array(
+                [
+                    vect.at[j, 0].get(),
+                    norms * jnp.cos(angles.at[j].get() * np.pi / 180),
+                    norms * jnp.sin(angles.at[j].get() * np.pi / 180),
+                ]
+            )
+        )
+        newvect = new_quarters.at[j, :].get() - new_quarters.at[j + 1, :].get()
+        ysection = vect.at[j].get() / jnp.linalg.norm(vect.at[j].get())
+        zsection = jnp.cross(ysection, xsection)
+        newysection = newvect / jnp.linalg.norm(newvect)
+        newzsection = jnp.cross(newysection, xsection)
+        for i in range(s0):
+            points = mesh.at[i, j, :].get() - quarter_chord.at[j, :].get()
+            x = jnp.dot(points, xsection)
+            z = jnp.dot(points, zsection)
+            new_mesh = new_mesh.at[i, j, :].set(new_quarters.at[j, :].get() + x * xsection + z * newzsection)
+    return new_mesh
+
 
 class DiffTwist(om.ExplicitComponent):
     def initialize(self):
@@ -82,20 +107,20 @@ class DiffTwist(om.ExplicitComponent):
     def setup(self):
         N = self.options["N"]
         self.N = N
-        self.add_input("dtwist_cp", val = np.zeros(N))
-        self.add_output("twist_cp", val = np.zeros(N))
-        self.declare_partials(of = "twist_cp", wrt = "dtwist_cp")
+        self.add_input("dtwist_cp", val=np.zeros(N))
+        self.add_output("twist_cp", val=np.zeros(N))
+        self.declare_partials(of="twist_cp", wrt="dtwist_cp")
 
     def compute(self, inputs, outputs):
         outputs["twist_cp"][-1] = inputs["dtwist_cp"][-1]
         for k in range(1, self.N):
-            outputs["twist_cp"][-1-k] = inputs["dtwist_cp"][-k] + inputs["dtwist_cp"][-k-1]
+            outputs["twist_cp"][-1 - k] = inputs["dtwist_cp"][-k] + inputs["dtwist_cp"][-k - 1]
 
     def compute_partials(self, inputs, J):
         J["twist_cp", "dtwist_cp"][-1, -1] = 1
         for k in range(1, self.N):
-            J["twist_cp", "dtwist_cp"][-1-k, -k] = 1
-            J["twist_cp", "dtwist_cp"][-1-k, -k-1] = 1
+            J["twist_cp", "dtwist_cp"][-1 - k, -k] = 1
+            J["twist_cp", "dtwist_cp"][-1 - k, -k - 1] = 1
 
 
 class Angles(om.ExplicitComponent):
@@ -103,24 +128,24 @@ class Angles(om.ExplicitComponent):
         """
         Declare options.
         """
-        #self.options.declare("mesh")
+        # self.options.declare("mesh")
         self.options.declare("mesh_shape", desc="mesh")
         self.options.declare("val", desc="Initial value for angles dihedral")
 
     def setup(self):
         mesh_shape = self.options["mesh_shape"]
         val = self.options["val"]
-        self.add_input("in_mesh", val = np.zeros(mesh_shape))
-        self.add_input("angles", val = val)
-        self.add_output("mesh", val= np.zeros(mesh_shape))
-        self.declare_partials(of = "mesh", wrt = "in_mesh")
-        self.declare_partials(of = "mesh", wrt = "angles")
+        self.add_input("in_mesh", val=np.zeros(mesh_shape))
+        self.add_input("angles", val=val)
+        self.add_output("mesh", val=np.zeros(mesh_shape))
+        self.declare_partials(of="mesh", wrt="in_mesh")
+        self.declare_partials(of="mesh", wrt="angles")
 
     def compute(self, inputs, outputs):
         in_mesh = jnp.array(inputs["in_mesh"])
         angles = jnp.array(inputs["angles"])
         mesh_shape = self.options["mesh_shape"]
-        outputs["mesh"] = apply_angles(in_mesh,angles, mesh_shape)
+        outputs["mesh"] = apply_angles(in_mesh, angles, mesh_shape)
 
     def compute_partials(self, inputs, J):
         in_mesh = jnp.array(inputs["in_mesh"])
@@ -129,8 +154,8 @@ class Angles(om.ExplicitComponent):
         p = np.prod(mesh_shape)
         J1 = jacfwd(apply_angles, 0)(in_mesh, angles, mesh_shape)
         J2 = jacfwd(apply_angles, 1)(in_mesh, angles, mesh_shape)
-        J["mesh","in_mesh"] = J1.reshape((p,p))
-        J["mesh","angles"] = J2.reshape((p,mesh_shape[1]-1))
+        J["mesh", "in_mesh"] = J1.reshape((p, p))
+        J["mesh", "angles"] = J2.reshape((p, mesh_shape[1] - 1))
 
 
 class Taper(om.ExplicitComponent):
@@ -294,7 +319,7 @@ class ScaleX(om.ExplicitComponent):
 
         te = mesh[-1]
         le = mesh[0]
-        quarter_chord = alpha * te + (1-alpha) * le
+        quarter_chord = alpha * te + (1 - alpha) * le
 
         outputs["mesh"] = np.einsum("ijk,j->ijk", mesh - quarter_chord, chord_dist) + quarter_chord
 
@@ -305,7 +330,7 @@ class ScaleX(om.ExplicitComponent):
 
         te = mesh[-1]
         le = mesh[0]
-        quarter_chord = alpha * te + (1-alpha) * le
+        quarter_chord = alpha * te + (1 - alpha) * le
 
         partials["mesh", "chord"] = (mesh - quarter_chord).flatten()
 
@@ -317,11 +342,11 @@ class ScaleX(om.ExplicitComponent):
         d_qc = (np.einsum("ij,i->ij", np.ones((ny, 3)), 1.0 - chord_dist)).flatten()
         nnq = (nx - 1) * ny * 3
         partials["mesh", "in_mesh"][nn : nn + nnq] = np.tile(alpha * d_qc, nx - 1)
-        partials["mesh", "in_mesh"][nn + nnq :] = np.tile((1-alpha) * d_qc, nx - 1)
+        partials["mesh", "in_mesh"][nn + nnq :] = np.tile((1 - alpha) * d_qc, nx - 1)
 
         nnq = ny * 3
         partials["mesh", "in_mesh"][nn - nnq : nn] += alpha * d_qc
-        partials["mesh", "in_mesh"][:nnq] += (1-alpha) * d_qc
+        partials["mesh", "in_mesh"][:nnq] += (1 - alpha) * d_qc
 
 
 class ScaleXold(om.ExplicitComponent):
@@ -1113,7 +1138,7 @@ class Rotate(om.ExplicitComponent):
         rotate_x = self.options["rotate_x"]
         theta_y = inputs["twist"]
         mesh = inputs["in_mesh"]
-        
+
         te = mesh[-1]
         le = mesh[0]
         quarter_chord = 0.25 * te + 0.75 * le
@@ -1169,7 +1194,7 @@ class Rotate(om.ExplicitComponent):
         rotate_x = self.options["rotate_x"]
         theta_y = inputs["twist"]
         mesh = inputs["in_mesh"]
-        
+
         te = mesh[-1]
         le = mesh[0]
         quarter_chord = 0.25 * te + 0.75 * le

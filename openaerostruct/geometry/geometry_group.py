@@ -66,7 +66,9 @@ class Geometry(om.Group):
             bsp_inputs = []
             if "dtwist_cp" in surface.keys():
                 n_cp = len(surface["dtwist_cp"])
-                self.add_subsystem("dtwist_bsp",DiffTwist(N = n_cp),
+                self.add_subsystem(
+                    "dtwist_bsp",
+                    DiffTwist(N=n_cp),
                     promotes_inputs=["dtwist_cp"],
                     promotes_outputs=["twist_cp"],
                 )
@@ -85,7 +87,6 @@ class Geometry(om.Group):
                 if surface.get("dtwist_cp_dv", True):
                     self.set_input_defaults("dtwist_cp", val=surface["dtwist_cp"], units="deg")
 
-            
             if "twist_cp" in surface.keys():
                 n_cp = len(surface["twist_cp"])
                 # Add bspline components for active bspline geometric variables.
@@ -104,7 +105,7 @@ class Geometry(om.Group):
                 # Since default assumption is that we want tail rotation as a design variable, add this to allow for trimmed drag polar where the tail rotation should not be a design variable
                 if surface.get("twist_cp_dv", True):
                     self.set_input_defaults("twist_cp", val=surface["twist_cp"], units="deg")
-            
+
             if "chord_cp" in surface.keys():
                 n_cp = len(surface["chord_cp"])
                 # Add bspline components for active bspline geometric variables.
@@ -219,7 +220,7 @@ class Geometry(om.Group):
             if "angles_cp" in surface.keys():
                 n_cp = len(surface["angles_cp"])
                 # Add bspline components for active bspline geometric variables.
-                x_interp = np.linspace(0.0, 1.0, int(ny-1))
+                x_interp = np.linspace(0.0, 1.0, int(ny - 1))
                 comp = self.add_subsystem(
                     "angles_bsp",
                     om.SplineComp(
@@ -230,7 +231,8 @@ class Geometry(om.Group):
                 )
                 comp.add_spline(y_cp_name="angles_cp", y_interp_name="angles", y_units="deg")
                 bsp_inputs.append("angles")
-
+                if surface.get("angles_cp_dv", True):
+                    self.set_input_defaults("angles_cp", val=surface["angles_cp"], units="deg")
 
             self.add_subsystem(
                 "mesh", GeometryMesh(surface=surface), promotes_inputs=bsp_inputs, promotes_outputs=["mesh"]

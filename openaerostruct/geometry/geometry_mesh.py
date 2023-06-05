@@ -171,8 +171,8 @@ class GeometryMesh(om.Group):
             Angles(mesh_shape=mesh_shape, val = val),
             promotes_inputs=promotes
         )"""
-        # val = np.zeros(ny-1)
-        val = measure_angles(mesh)
+        val = np.zeros(ny - 1)
+        # val = measure_angles(mesh)
         if "angles_cp" in surface:
             promotes = ["angles"]
             # val = measure_angles(mesh)
