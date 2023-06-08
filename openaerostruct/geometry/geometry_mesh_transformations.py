@@ -144,7 +144,7 @@ class Angles(om.ExplicitComponent):
     def compute(self, inputs, outputs):
         in_mesh = jnp.array(inputs["in_mesh"])
         angles = jnp.array(inputs["angles"])
-        mesh_shape = self.options["mesh_shape"]
+        mesh_shape = jnp.array(self.options["mesh_shape"])
         outputs["mesh"] = apply_angles(in_mesh, angles, mesh_shape)
 
     def compute_partials(self, inputs, J):
