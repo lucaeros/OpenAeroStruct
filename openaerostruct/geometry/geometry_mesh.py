@@ -17,6 +17,7 @@ from openaerostruct.geometry.geometry_mesh_transformations import (
     Angles,
     measure_angles,
 )
+import warnings
 
 
 class GeometryMesh(om.Group):
@@ -79,12 +80,23 @@ class GeometryMesh(om.Group):
         # 2. Scale X
 
         val = np.ones(ny)
+        chord_scaling_pos = 0.25  # if no scaling position is specified : chord scaling w.r.t quarter of chord
         if "chord_cp" in surface:
             promotes = ["chord"]
+            if "chord_scaling_pos" in surface:
+                chord_scaling_pos = surface["chord_scaling_pos"]
         else:
+            if "chord_scaling_pos" in surface:
+                warnings.warn(
+                    "Chord_scaling_pos has been specified but no chord design variable available", stacklevel=2
+                )
             promotes = []
 
-        self.add_subsystem("scale_x", ScaleX(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
+        self.add_subsystem(
+            "scale_x",
+            ScaleX(val=val, mesh_shape=mesh_shape, chord_scaling_pos=chord_scaling_pos),
+            promotes_inputs=promotes,
+        )
 
         # 3. Sweep
 
