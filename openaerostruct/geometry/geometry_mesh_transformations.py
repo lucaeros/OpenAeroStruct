@@ -4,7 +4,7 @@
 from re import S
 import numpy as np
 import jax.numpy as jnp
-from jax import grad, jacfwd, jacrev
+from jax import grad, jacfwd, jacrev, jit
 from jax.config import config
 
 config.update("jax_enable_x64", True)
@@ -22,7 +22,8 @@ def measure_angles(mesh):
     return theta_x
 
 
-def apply_angles(mesh, angles, mesh_shape):
+def apply_angles(mesh, angles):
+    mesh_shape = mesh.shape
     xsection = jnp.array([1, 0, 0])
     te = mesh[-1]
     le = mesh[0]
@@ -55,45 +56,6 @@ def apply_angles(mesh, angles, mesh_shape):
             points = mesh[i, j, :] - quarter_chord[j, :]
             z = jnp.dot(points, zsection)
             new_mesh = new_mesh.at[i, j, :].set(new_quarters[j, :] + points[0] * xsection + z * newzsection)
-    return new_mesh
-
-
-def apply_angles_old(mesh, angles, mesh_shape):
-    xsection = jnp.array([1, 0, 0])
-    te = mesh.at[-1].get()
-    le = mesh.at[0].get()
-    s0 = mesh_shape[0]
-    s1 = mesh_shape[1]
-    quarter_chord = 0.25 * te + 0.75 * le
-    vect = quarter_chord.at[:-1, :].get() - quarter_chord.at[1:, :].get()
-    # points = jnp.array([[mesh.at[i,j,:].get()-quarter_chord.at[j,:].get() for j in range(s1-1)] for i in range(s0)])
-    new_quarters = jnp.zeros(quarter_chord.shape)
-    new_quarters = new_quarters.at[s1 - 1, :].set(quarter_chord.at[s1 - 1, :].get())
-    # norms = jnp.array([jnp.sqrt(vect.at[j, 1].get()**2+vect.at[j,2].get()**2) for j in range(s1-1)])
-    new_mesh = jnp.zeros(mesh_shape)
-    new_mesh = new_mesh.at[:, -1, :].set(mesh.at[:, -1, :].get())
-    for j in reversed(range(s1 - 1)):
-        norms = jnp.sqrt(vect.at[j, 1].get() ** 2 + vect.at[j, 2].get() ** 2)
-        new_quarters = new_quarters.at[j, :].set(
-            new_quarters.at[j + 1, :].get()
-            + jnp.array(
-                [
-                    vect.at[j, 0].get(),
-                    norms * jnp.cos(angles.at[j].get() * np.pi / 180),
-                    norms * jnp.sin(angles.at[j].get() * np.pi / 180),
-                ]
-            )
-        )
-        newvect = new_quarters.at[j, :].get() - new_quarters.at[j + 1, :].get()
-        ysection = vect.at[j].get() / jnp.linalg.norm(vect.at[j].get())
-        zsection = jnp.cross(ysection, xsection)
-        newysection = newvect / jnp.linalg.norm(newvect)
-        newzsection = jnp.cross(newysection, xsection)
-        for i in range(s0):
-            points = mesh.at[i, j, :].get() - quarter_chord.at[j, :].get()
-            x = jnp.dot(points, xsection)
-            z = jnp.dot(points, zsection)
-            new_mesh = new_mesh.at[i, j, :].set(new_quarters.at[j, :].get() + x * xsection + z * newzsection)
     return new_mesh
 
 
@@ -140,20 +102,23 @@ class Angles(om.ExplicitComponent):
         self.add_output("mesh", val=np.zeros(mesh_shape))
         self.declare_partials(of="mesh", wrt="in_mesh")
         self.declare_partials(of="mesh", wrt="angles")
+        self.func = apply_angles
+        self.J1 = jacfwd(apply_angles, 0)
+        self.J2 = jacfwd(apply_angles, 1)
 
     def compute(self, inputs, outputs):
         in_mesh = jnp.array(inputs["in_mesh"])
         angles = jnp.array(inputs["angles"])
         mesh_shape = jnp.array(self.options["mesh_shape"])
-        outputs["mesh"] = apply_angles(in_mesh, angles, mesh_shape)
+        outputs["mesh"] = self.func(in_mesh, angles)
 
     def compute_partials(self, inputs, J):
         in_mesh = jnp.array(inputs["in_mesh"])
         angles = jnp.array(inputs["angles"])
         mesh_shape = jnp.array(self.options["mesh_shape"])
         p = np.prod(mesh_shape)
-        J1 = jacfwd(apply_angles, 0)(in_mesh, angles, mesh_shape)
-        J2 = jacfwd(apply_angles, 1)(in_mesh, angles, mesh_shape)
+        J1 = self.J1(in_mesh, angles)
+        J2 = self.J2(in_mesh, angles)
         J["mesh", "in_mesh"] = J1.reshape((p, p))
         J["mesh", "angles"] = J2.reshape((p, mesh_shape[1] - 1))
 
