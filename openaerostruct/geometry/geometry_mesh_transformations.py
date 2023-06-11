@@ -97,14 +97,14 @@ class Angles(om.ExplicitComponent):
     def setup(self):
         mesh_shape = self.options["mesh_shape"]
         val = self.options["val"]
-        self.add_input("in_mesh", val=np.zeros(mesh_shape))
-        self.add_input("angles", val=val)
-        self.add_output("mesh", val=np.zeros(mesh_shape))
+        self.add_input("in_mesh", val=np.zeros(mesh_shape), units="m")
+        self.add_input("angles", val=val, units="deg")
+        self.add_output("mesh", val=np.zeros(mesh_shape), units="m")
         self.declare_partials(of="mesh", wrt="in_mesh")
         self.declare_partials(of="mesh", wrt="angles")
-        self.func = apply_angles
-        self.J1 = jacfwd(apply_angles, 0)
-        self.J2 = jacfwd(apply_angles, 1)
+        self.func = jit(apply_angles)
+        self.J1 = jit(jacfwd(apply_angles, 0))
+        self.J2 = jit(jacfwd(apply_angles, 1))
 
     def compute(self, inputs, outputs):
         in_mesh = jnp.array(inputs["in_mesh"])
