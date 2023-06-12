@@ -16,6 +16,7 @@ from openaerostruct.geometry.geometry_mesh_transformations import (
     Rotate,
     Angles,
     measure_angles,
+    measure_twist,
 )
 import warnings
 
@@ -170,6 +171,7 @@ class GeometryMesh(om.Group):
 
         self.add_subsystem("shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
 
+        # val = np.zeros(1)
         val = measure_angles(mesh)
         if "angles_cp" in surface:
             promotes = ["angles"]
@@ -180,11 +182,12 @@ class GeometryMesh(om.Group):
         self.add_subsystem("angles", Angles(mesh_shape=mesh_shape, val=val), promotes_inputs=promotes)
         # 9. Rotate
 
-        val = np.zeros(ny)
+        val = measure_twist(mesh)
+        print(" TWIST ", val)
+        # val = np.zeros(ny)
         if "dtwist_cp" or "twist_cp" in surface:
             promotes = ["twist"]
         else:
-            val = np.zeros(ny)
             promotes = []
 
         self.add_subsystem(

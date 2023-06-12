@@ -22,6 +22,24 @@ def measure_angles(mesh):
     return theta_x
 
 
+def measure_twist(mesh):
+    xaxis = np.array([1, 0, 0])
+    te = mesh[-1]
+    le = mesh[0]
+    quarter_chord = 0.25 * te + 0.75 * le
+    dz_qc = quarter_chord[:-1, 2] - quarter_chord[1:, 2]
+    dy_qc = quarter_chord[:-1, 1] - quarter_chord[1:, 1]
+    theta_x = np.arctan(dz_qc / dy_qc)
+    theta_x = np.append(theta_x, 0.0)
+    phi_y = np.zeros(len(theta_x))
+    for k in range(len(theta_x)):
+        normal = np.array([0, np.cos(theta_x[k]), np.sin(theta_x[k])])
+        LEq = mesh[0, k, :] - quarter_chord[k, :]
+        LEq = LEq / np.linalg.norm(LEq)
+        phi_y[k] = np.arcsin(np.dot(np.cross(LEq, xaxis), normal)) * 180 / np.pi
+    return phi_y
+
+
 def apply_angles(mesh, angles):
     mesh_shape = mesh.shape
     xsection = jnp.array([1, 0, 0])
