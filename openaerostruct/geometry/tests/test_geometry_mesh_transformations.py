@@ -16,6 +16,7 @@ from openaerostruct.geometry.geometry_mesh_transformations import (
     Dihedral,
     ShearZ,
     Rotate,
+    Angles,
 )
 from openaerostruct.geometry.utils import generate_mesh
 
@@ -344,6 +345,28 @@ class Test(unittest.TestCase):
         val = self.rng.random(NY)
 
         comp = ShearZ(val=val, mesh_shape=mesh.shape)
+        group.add_subsystem("comp", comp)
+
+        prob.setup()
+
+        prob["comp.in_mesh"] = mesh
+
+        prob.run_model()
+
+        check = prob.check_partials(compact_print=True, abs_err_tol=1e-5, rel_err_tol=1e-5)
+        assert_check_partials(check, atol=1e-6, rtol=1e-6)
+
+    def test_angle(self):
+        symmetry = False
+        mesh = get_mesh(symmetry)
+
+        prob = om.Problem()
+        group = prob.model
+
+        val = self.rng.random(NY)
+        ref_axis_pos = self.rng.random(1)
+
+        comp = Angles(val=val, mesh_shape=mesh.shape, ref_axis_pos=ref_axis_pos)
         group.add_subsystem("comp", comp)
 
         prob.setup()

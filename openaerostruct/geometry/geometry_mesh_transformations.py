@@ -11,10 +11,10 @@ config.update("jax_enable_x64", True)
 import openmdao.api as om
 
 
-def measure_angles(mesh):
+def measure_angles(mesh, ref_axis_pos=0.25):
     te = mesh[-1]
     le = mesh[0]
-    quarter_chord = 0.25 * te + 0.75 * le
+    quarter_chord = ref_axis_pos * te + (1 - ref_axis_pos) * le
     dz_qc = quarter_chord[:-1, 2] - quarter_chord[1:, 2]
     dy_qc = quarter_chord[:-1, 1] - quarter_chord[1:, 1]
     theta_x = np.arctan(dz_qc / dy_qc) * 180 / np.pi
@@ -40,7 +40,26 @@ def measure_twist(mesh):
     return phi_y
 
 
-def apply_angles(mesh, angles):
+def apply_angles(mesh, angles, ref_axis_pos=0.25):
+    mesh_shape = mesh.shape
+    ref_axis = ref_axis_pos * mesh[-1, :, :] + (1 - ref_axis_pos) * mesh[0, :, :]
+    vect = ref_axis[:-1, :] - ref_axis[1:, :]
+    new_ref_axis = ref_axis.copy()
+    new_mesh = mesh.copy()
+    for j in reversed(range(mesh_shape[1] - 1)):
+        norms = np.sqrt(vect[j, 1] ** 2 + vect[j, 2] ** 2)
+        new_ref_axis[j, :] = new_ref_axis[j + 1, :] + np.array(
+            [
+                vect[j, 0],
+                norms * np.cos(angles[j] * np.pi / 180),
+                norms * np.sin(angles[j] * np.pi / 180),
+            ]
+        )
+        new_mesh[:, j, 1:] = new_ref_axis[j, 1:]
+    return new_mesh
+
+
+def apply_angles_old(mesh, angles):
     mesh_shape = mesh.shape
     xsection = jnp.array([1, 0, 0])
     te = mesh[-1]
@@ -77,6 +96,49 @@ def apply_angles(mesh, angles):
     return new_mesh
 
 
+class AnglesOld(om.ExplicitComponent):
+    def initialize(self):
+        """
+        Declare options.
+        """
+        # self.options.declare("mesh")
+        self.options.declare("mesh_shape", desc="mesh")
+        self.options.declare("val", desc="Initial value for angles dihedral")
+        self.options.declare(
+            "ref_axis_pos",
+            default=0.25,
+            desc="Fraction of the chord that is use as the reference axis line",
+        )
+
+    def setup(self):
+        mesh_shape = self.options["mesh_shape"]
+        val = self.options["val"]
+        self.add_input("in_mesh", val=np.zeros(mesh_shape), units="m")
+        self.add_input("angles", val=val, units="deg")
+        self.add_output("mesh", val=np.zeros(mesh_shape), units="m")
+        self.declare_partials(of="mesh", wrt="in_mesh")
+        self.declare_partials(of="mesh", wrt="angles")
+        self.func = jit(apply_angles)
+        self.J1 = jit(jacfwd(apply_angles, 0))
+        self.J2 = jit(jacfwd(apply_angles, 1))
+
+    def compute(self, inputs, outputs):
+        in_mesh = jnp.array(inputs["in_mesh"])
+        angles = jnp.array(inputs["angles"])
+        mesh_shape = jnp.array(self.options["mesh_shape"])
+        outputs["mesh"] = self.func(in_mesh, angles)
+
+    def compute_partials(self, inputs, J):
+        in_mesh = jnp.array(inputs["in_mesh"])
+        angles = jnp.array(inputs["angles"])
+        mesh_shape = jnp.array(self.options["mesh_shape"])
+        p = np.prod(mesh_shape)
+        J1 = self.J1(in_mesh, angles)
+        J2 = self.J2(in_mesh, angles)
+        J["mesh", "in_mesh"] = J1.reshape((p, p))
+        J["mesh", "angles"] = J2.reshape((p, mesh_shape[1] - 1))
+
+
 class DiffTwist(om.ExplicitComponent):
     def initialize(self):
         """
@@ -111,34 +173,40 @@ class Angles(om.ExplicitComponent):
         # self.options.declare("mesh")
         self.options.declare("mesh_shape", desc="mesh")
         self.options.declare("val", desc="Initial value for angles dihedral")
+        self.options.declare(
+            "ref_axis_pos",
+            default=0.25,
+            desc="Fraction of the chord that is use as the reference axis line",
+        )
 
     def setup(self):
-        mesh_shape = self.options["mesh_shape"]
-        val = self.options["val"]
-        self.add_input("in_mesh", val=np.zeros(mesh_shape), units="m")
-        self.add_input("angles", val=val, units="deg")
-        self.add_output("mesh", val=np.zeros(mesh_shape), units="m")
-        self.declare_partials(of="mesh", wrt="in_mesh")
-        self.declare_partials(of="mesh", wrt="angles")
-        self.func = jit(apply_angles)
-        self.J1 = jit(jacfwd(apply_angles, 0))
-        self.J2 = jit(jacfwd(apply_angles, 1))
+        self.mesh_shape = self.options["mesh_shape"]
+        self.val = self.options["val"]
+        self.ref_axis_pos = self.options["ref_axis_pos"]
+        self.add_input("in_mesh", val=np.zeros(self.mesh_shape), units="m")
+        self.add_input("angles", val=self.val, units="deg")
+        self.add_output("mesh", val=np.zeros(self.mesh_shape), units="m")
+        self.declare_partials(of="mesh", wrt="in_mesh", method="cs")
+        self.declare_partials(of="mesh", wrt="angles", method="cs")
 
     def compute(self, inputs, outputs):
-        in_mesh = jnp.array(inputs["in_mesh"])
-        angles = jnp.array(inputs["angles"])
-        mesh_shape = jnp.array(self.options["mesh_shape"])
-        outputs["mesh"] = self.func(in_mesh, angles)
-
-    def compute_partials(self, inputs, J):
-        in_mesh = jnp.array(inputs["in_mesh"])
-        angles = jnp.array(inputs["angles"])
-        mesh_shape = jnp.array(self.options["mesh_shape"])
-        p = np.prod(mesh_shape)
-        J1 = self.J1(in_mesh, angles)
-        J2 = self.J2(in_mesh, angles)
-        J["mesh", "in_mesh"] = J1.reshape((p, p))
-        J["mesh", "angles"] = J2.reshape((p, mesh_shape[1] - 1))
+        mesh = inputs["in_mesh"]
+        angles = inputs["angles"]
+        ref_axis = self.ref_axis_pos * mesh[-1, :, :] + (1 - self.ref_axis_pos) * mesh[0, :, :]
+        vect = ref_axis[:-1, :] - ref_axis[1:, :]
+        new_ref_axis = ref_axis.copy()
+        new_mesh = mesh.copy()
+        for j in reversed(range(self.mesh_shape[1] - 1)):
+            norms = np.sqrt(vect[j, 1] ** 2 + vect[j, 2] ** 2)
+            new_ref_axis[j, :] = new_ref_axis[j + 1, :] + np.array(
+                [
+                    vect[j, 0],
+                    norms * np.cos(angles[j] * np.pi / 180),
+                    norms * np.sin(angles[j] * np.pi / 180),
+                ]
+            )
+            new_mesh[:, j, 1:] = new_ref_axis[j, 1:]
+        outputs["mesh"] = new_mesh
 
 
 class Taper(om.ExplicitComponent):

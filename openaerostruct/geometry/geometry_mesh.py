@@ -88,16 +88,9 @@ class GeometryMesh(om.Group):
         # 2. Scale X
 
         val = np.ones(ny)
-        chord_scaling_pos = 0.25  # if no scaling position is specified : chord scaling w.r.t quarter of chord
         if "chord_cp" in surface:
             promotes = ["chord"]
-            if "chord_scaling_pos" in surface:
-                chord_scaling_pos = surface["chord_scaling_pos"]
         else:
-            if "chord_scaling_pos" in surface:
-                warnings.warn(
-                    "Chord_scaling_pos has been specified but no chord design variable available", stacklevel=2
-                )
             promotes = []
 
         self.add_subsystem(
@@ -181,18 +174,26 @@ class GeometryMesh(om.Group):
         self.add_subsystem("shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
 
         # val = np.zeros(1)
-        val = measure_angles(mesh)
         if "angles_cp" in surface:
             promotes = ["angles"]
             # val = measure_angles(mesh)
+            val = np.zeros(ny - 1)
         else:
             promotes = []
+            te = mesh[-1]
+            le = mesh[0]
+            ref_axis = ref_axis_pos * te + (1 - ref_axis_pos) * le
+            dz_qc = ref_axis[:-1, 2] - ref_axis[1:, 2]
+            dy_qc = ref_axis[:-1, 1] - ref_axis[1:, 1]
+            val = np.arctan(dz_qc / dy_qc) * 180 / np.pi
 
-        self.add_subsystem("angles", Angles(mesh_shape=mesh_shape, val=val), promotes_inputs=promotes)
+        self.add_subsystem(
+            "angles", Angles(val=val, mesh_shape=mesh.shape, ref_axis_pos=ref_axis_pos), promotes_inputs=promotes
+        )
         # 9. Rotate
 
-        val = measure_twist(mesh)
-        # val = np.zeros(ny)
+        # val = measure_twist(mesh)
+        val = np.zeros(ny)
         if "dtwist_cp" or "twist_cp" in surface:
             promotes = ["twist"]
         else:
