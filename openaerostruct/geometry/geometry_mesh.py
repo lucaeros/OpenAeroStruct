@@ -192,8 +192,8 @@ class GeometryMesh(om.Group):
         )
         # 9. Rotate
 
-        val = measure_twist(mesh)
-        # val = np.zeros(ny)
+        # val = measure_twist(mesh)
+        val = np.zeros(ny)
         if "dtwist_cp" or "twist_cp" in surface:
             promotes = ["twist"]
         else:
@@ -205,20 +205,20 @@ class GeometryMesh(om.Group):
             promotes_inputs=promotes,
             promotes_outputs=["mesh"],
         )
-
-        names = [
-            "taper",
-            "scale_x",
-            "sweep",
-            "shear_x",
-            "stretch",
-            "shear_y",
-            "dihedral",
-            "shear_z",
-            "angles",
-            "rotate",
-        ]
-        # names = ["taper", "scale_x", "sweep", "shear_x", "stretch", "shear_y", "dihedral", "shear_z", "rotate"]
-
+        if "angles_cp" in surface:
+            names = [
+                "taper",
+                "scale_x",
+                "sweep",
+                "shear_x",
+                "stretch",
+                "shear_y",
+                "dihedral",
+                "shear_z",
+                "angles",
+                "rotate",
+            ]
+        else:
+            names = ["taper", "scale_x", "sweep", "shear_x", "stretch", "shear_y", "dihedral", "shear_z", "rotate"]
         for j in np.arange(len(names) - 1):
             self.connect(names[j] + ".mesh", names[j + 1] + ".in_mesh")
