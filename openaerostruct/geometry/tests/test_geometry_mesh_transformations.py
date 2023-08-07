@@ -369,13 +369,13 @@ class Test(unittest.TestCase):
         comp = Angles(val=val, mesh_shape=mesh.shape, ref_axis_pos=ref_axis_pos)
         group.add_subsystem("comp", comp)
 
-        prob.setup()
+        prob.setup(force_alloc_complex=True)
 
         prob["comp.in_mesh"] = mesh
 
         prob.run_model()
 
-        check = prob.check_partials(compact_print=True, abs_err_tol=1e-5, rel_err_tol=1e-5)
+        check = prob.check_partials(compact_print=True, method="cs", step=1e-200, abs_err_tol=1e-5, rel_err_tol=1e-5)
         assert_check_partials(check, atol=1e-6, rtol=1e-6)
 
     def test_rotate(self):

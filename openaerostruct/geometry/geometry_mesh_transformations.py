@@ -197,39 +197,27 @@ class Angles(om.ExplicitComponent):
         new_ref_axis = ref_axis.copy()
         new_mesh = mesh.copy()
         mesh_shape = mesh.shape
-        xsection = jnp.array([1, 0, 0])
-        te = mesh[-1]
-        le = mesh[0]
-        s0 = mesh_shape[0]
-        s1 = mesh_shape[1]
-        quarter_chord = 0.25 * te + 0.75 * le
-        vect = quarter_chord[:-1, :] - quarter_chord[1:, :]
-        new_quarters = jnp.zeros(quarter_chord.shape)
-        new_quarters = new_quarters.at[s1 - 1, :].set(quarter_chord[s1 - 1, :])
-        new_mesh = jnp.zeros(mesh_shape)
-        new_mesh = new_mesh.at[:, -1, :].set(mesh[:, -1, :])
-        for j in reversed(range(s1 - 1)):
-            norms = jnp.sqrt(vect.at[j, 1].get() ** 2 + vect.at[j, 2].get() ** 2)
-            new_quarters = new_quarters.at[j, :].set(
-                new_quarters[j + 1, :]
-                + jnp.array(
-                    [
-                        vect[j, 0],
-                        norms * jnp.cos(angles[j] * np.pi / 180),
-                        norms * jnp.sin(angles[j] * np.pi / 180),
-                    ]
-                )
+        xsection = np.zeros(3)
+        xsection[0] = 1
+        for j in reversed(range(mesh_shape[1] - 1)):
+            norms = np.sqrt(vect[j, 1] ** 2 + vect[j, 2] ** 2)
+            new_ref_axis[j, :] = new_ref_axis[j + 1, :] + np.array(
+                [
+                    vect[j, 0],
+                    norms * np.cos(angles[j] * np.pi / 180),
+                    norms * np.sin(angles[j] * np.pi / 180),
+                ]
             )
-            newvect = new_quarters[j, :] - new_quarters[j + 1, :]
-            ysection = vect[j] / jnp.linalg.norm(vect[j])
-            zsection = jnp.cross(ysection, xsection)
-            newysection = newvect / jnp.linalg.norm(newvect)
-            newzsection = jnp.cross(newysection, xsection)
-            for i in range(s0):
-                points = mesh[i, j, :] - quarter_chord[j, :]
-                z = jnp.dot(points, zsection)
-                new_mesh = new_mesh.at[i, j, :].set(new_quarters[j, :] + points[0] * xsection + z * newzsection)
-        return new_mesh
+            new_vect = new_ref_axis[j, :] - new_ref_axis[j + 1, :]
+            ysection = vect[j] / np.linalg.norm(vect[j])
+            zsection = np.cross(ysection, xsection)
+            newysection = new_vect / jnp.linalg.norm(new_vect)
+            newzsection = np.cross(newysection, xsection)
+            for i in range(mesh_shape[0]):
+                points = mesh[i, j, :] - ref_axis[j, :]
+                z = np.dot(points, zsection)
+                new_mesh[i, j, :] = new_ref_axis[j, :] + points[0] * xsection + z * newzsection
+        outputs["mesh"] = new_mesh
 
 
 class Angles_old(om.ExplicitComponent):
