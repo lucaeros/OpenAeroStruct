@@ -192,8 +192,8 @@ class GeometryMesh(om.Group):
         )
         # 9. Rotate
 
-        # val = measure_twist(mesh)
-        val = np.zeros(ny)
+        val = measure_twist(mesh)
+        # val = np.zeros(ny)
         if "dtwist_cp" or "twist_cp" in surface:
             promotes = ["twist"]
         else:
