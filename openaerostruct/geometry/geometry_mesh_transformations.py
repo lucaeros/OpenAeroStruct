@@ -196,6 +196,73 @@ class Angles(om.ExplicitComponent):
         vect = ref_axis[:-1, :] - ref_axis[1:, :]
         new_ref_axis = ref_axis.copy()
         new_mesh = mesh.copy()
+        mesh_shape = mesh.shape
+        xsection = jnp.array([1, 0, 0])
+        te = mesh[-1]
+        le = mesh[0]
+        s0 = mesh_shape[0]
+        s1 = mesh_shape[1]
+        quarter_chord = 0.25 * te + 0.75 * le
+        vect = quarter_chord[:-1, :] - quarter_chord[1:, :]
+        new_quarters = jnp.zeros(quarter_chord.shape)
+        new_quarters = new_quarters.at[s1 - 1, :].set(quarter_chord[s1 - 1, :])
+        new_mesh = jnp.zeros(mesh_shape)
+        new_mesh = new_mesh.at[:, -1, :].set(mesh[:, -1, :])
+        for j in reversed(range(s1 - 1)):
+            norms = jnp.sqrt(vect.at[j, 1].get() ** 2 + vect.at[j, 2].get() ** 2)
+            new_quarters = new_quarters.at[j, :].set(
+                new_quarters[j + 1, :]
+                + jnp.array(
+                    [
+                        vect[j, 0],
+                        norms * jnp.cos(angles[j] * np.pi / 180),
+                        norms * jnp.sin(angles[j] * np.pi / 180),
+                    ]
+                )
+            )
+            newvect = new_quarters[j, :] - new_quarters[j + 1, :]
+            ysection = vect[j] / jnp.linalg.norm(vect[j])
+            zsection = jnp.cross(ysection, xsection)
+            newysection = newvect / jnp.linalg.norm(newvect)
+            newzsection = jnp.cross(newysection, xsection)
+            for i in range(s0):
+                points = mesh[i, j, :] - quarter_chord[j, :]
+                z = jnp.dot(points, zsection)
+                new_mesh = new_mesh.at[i, j, :].set(new_quarters[j, :] + points[0] * xsection + z * newzsection)
+        return new_mesh
+
+
+class Angles_old(om.ExplicitComponent):
+    def initialize(self):
+        """
+        Declare options.
+        """
+        # self.options.declare("mesh")
+        self.options.declare("mesh_shape", desc="mesh")
+        self.options.declare("val", desc="Initial value for angles dihedral")
+        self.options.declare(
+            "ref_axis_pos",
+            default=0.25,
+            desc="Fraction of the chord that is use as the reference axis line",
+        )
+
+    def setup(self):
+        self.mesh_shape = self.options["mesh_shape"]
+        self.val = self.options["val"]
+        self.ref_axis_pos = self.options["ref_axis_pos"]
+        self.add_input("in_mesh", val=np.zeros(self.mesh_shape), units="m")
+        self.add_input("angles", val=self.val, units="deg")
+        self.add_output("mesh", val=np.zeros(self.mesh_shape), units="m")
+        self.declare_partials(of="mesh", wrt="in_mesh", method="cs")
+        self.declare_partials(of="mesh", wrt="angles", method="cs")
+
+    def compute(self, inputs, outputs):
+        mesh = inputs["in_mesh"]
+        angles = inputs["angles"]
+        ref_axis = self.ref_axis_pos * mesh[-1, :, :] + (1 - self.ref_axis_pos) * mesh[0, :, :]
+        vect = ref_axis[:-1, :] - ref_axis[1:, :]
+        new_ref_axis = ref_axis.copy()
+        new_mesh = mesh.copy()
         for j in reversed(range(self.mesh_shape[1] - 1)):
             norms = np.sqrt(vect[j, 1] ** 2 + vect[j, 2] ** 2)
             new_ref_axis[j, :] = new_ref_axis[j + 1, :] + np.array(
