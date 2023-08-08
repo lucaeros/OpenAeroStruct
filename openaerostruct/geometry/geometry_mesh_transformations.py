@@ -220,7 +220,7 @@ class Angles(om.ExplicitComponent):
         outputs["mesh"] = new_mesh
 
 
-class Angles(om.ExplicitComponent):
+class Angles_old(om.ExplicitComponent):
     def initialize(self):
         """
         Declare options.
@@ -754,7 +754,7 @@ class Stretch(om.ExplicitComponent):
 
         # Compute the previous span and determine the scalar needed to reach the
         # desired span
-        prev_span = -(ref_axis[-1, 1] - ref_axis[0, 1])
+        prev_span = ref_axis[-1, 1] - ref_axis[0, 1]
         s = ref_axis[:, 1] / prev_span
 
         outputs["mesh"][:] = mesh
@@ -778,10 +778,10 @@ class Stretch(om.ExplicitComponent):
 
         # Compute the previous span and determine the scalar needed to reach the
         # desired span
-        prev_span = -(ref_axis[-1, 1] - ref_axis[0, 1])
+        prev_span = ref_axis[-1, 1] - ref_axis[0, 1]
         s = ref_axis[:, 1] / prev_span
 
-        d_prev_span = ref_axis[:, 1] / prev_span**2
+        d_prev_span = -ref_axis[:, 1] / prev_span**2
         d_prev_span_qc0 = np.zeros((ny,))
         d_prev_span_qc1 = np.zeros((ny,))
         d_prev_span_qc0[0] = d_prev_span_qc1[-1] = 1.0 / prev_span
