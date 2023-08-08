@@ -71,7 +71,7 @@ class GeometryMesh(om.Group):
         # This flag determines whether or not changes in z (dihedral) add an
         # additional rotation matrix to modify the twist direction
         self.rotate_x = True
-
+        names = ["taper"]
         # 1. Taper
 
         if "taper" in surface:
@@ -86,7 +86,7 @@ class GeometryMesh(om.Group):
         )
 
         # 2. Scale X
-
+        names.append("scale_x")
         val = np.ones(ny)
         if "chord_cp" in surface:
             promotes = ["chord"]
@@ -100,7 +100,7 @@ class GeometryMesh(om.Group):
         )
 
         # 3. Sweep
-
+        names.append("sweep")
         if "sweep" in surface:
             val = surface["sweep"]
             promotes = ["sweep"]
@@ -111,7 +111,7 @@ class GeometryMesh(om.Group):
         self.add_subsystem("sweep", Sweep(val=val, mesh_shape=mesh_shape, symmetry=symmetry), promotes_inputs=promotes)
 
         # 4. Shear X
-
+        names.append("shear_x")
         val = np.zeros(ny)
         if "xshear_cp" in surface:
             promotes = ["xshear"]
@@ -121,27 +121,18 @@ class GeometryMesh(om.Group):
         self.add_subsystem("shear_x", ShearX(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
 
         # 5. Stretch
-
         if "span" in surface:
             promotes = ["span"]
             val = surface["span"]
-        else:
-            # Compute span. We need .real to make span to avoid OpenMDAO warnings.
-            ref_axis = ref_axis_pos * mesh[-1, :, :] + (1 - ref_axis_pos) * mesh[0, :, :]
-            span = max(ref_axis[:, 1]).real - min(ref_axis[:, 1]).real
-            if symmetry:
-                span *= 2.0
-            val = span
-            promotes = []
-
-        self.add_subsystem(
-            "stretch",
-            Stretch(val=val, mesh_shape=mesh_shape, symmetry=symmetry, ref_axis_pos=ref_axis_pos),
-            promotes_inputs=promotes,
-        )
+            names.append("stretch")
+            self.add_subsystem(
+                "stretch",
+                Stretch(val=val, mesh_shape=mesh_shape, symmetry=symmetry, ref_axis_pos=ref_axis_pos),
+                promotes_inputs=promotes,
+            )
 
         # 6. Shear Y
-
+        names.append("shear_y")
         val = np.zeros(ny)
         if "yshear_cp" in surface:
             promotes = ["yshear"]
@@ -151,7 +142,7 @@ class GeometryMesh(om.Group):
         self.add_subsystem("shear_y", ShearY(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
 
         # 7. Dihedral
-
+        names.append("dihedral")
         if "dihedral" in surface:
             val = surface["dihedral"]
             promotes = ["dihedral"]
@@ -163,21 +154,13 @@ class GeometryMesh(om.Group):
             "dihedral", Dihedral(val=val, mesh_shape=mesh_shape, symmetry=symmetry), promotes_inputs=promotes
         )
 
-        # 8. Shear Z
-
-        val = np.zeros(ny)
-        if "zshear_cp" in surface:
-            promotes = ["zshear"]
-        else:
-            promotes = []
-
-        self.add_subsystem("shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
-
-        # val = np.zeros(1)
         if "angles_cp" in surface:
             promotes = ["angles"]
-            # val = measure_angles(mesh)
             val = np.zeros(ny - 1)
+            names.append("angles")
+            self.add_subsystem(
+                "angles", Angles(val=val, mesh_shape=mesh.shape, ref_axis_pos=ref_axis_pos), promotes_inputs=promotes
+            )
         else:
             promotes = []
             te = mesh[-1]
@@ -187,38 +170,31 @@ class GeometryMesh(om.Group):
             dy_qc = ref_axis[:-1, 1] - ref_axis[1:, 1]
             val = np.arctan(dz_qc / dy_qc) * 180 / np.pi
 
-        self.add_subsystem(
-            "angles", Angles(val=val, mesh_shape=mesh.shape, ref_axis_pos=ref_axis_pos), promotes_inputs=promotes
-        )
-        # 9. Rotate
+        # 8. Shear Z
 
-        val = measure_twist(mesh)
-        # val = np.zeros(ny)
-        if "dtwist_cp" or "twist_cp" in surface:
-            promotes = ["twist"]
+        val = np.zeros(ny)
+        names.append("shear_z")
+        if "zshear_cp" in surface:
+            promotes = ["zshear"]
         else:
             promotes = []
 
         self.add_subsystem(
-            "rotate",
-            Rotate(val=val, mesh_shape=mesh_shape, symmetry=symmetry, ref_axis_pos=ref_axis_pos),
-            promotes_inputs=promotes,
-            promotes_outputs=["mesh"],
+            "shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes, promotes_outputs=["mesh"]
         )
-        if "angles_cp" in surface:
-            names = [
-                "taper",
-                "scale_x",
-                "sweep",
-                "shear_x",
-                "stretch",
-                "shear_y",
-                "dihedral",
-                "shear_z",
-                "angles",
+
+        # 9. Rotate
+
+        if "twist_cp" in surface:
+            promotes = ["twist"]
+            self.add_subsystem(
                 "rotate",
-            ]
+                Rotate(val=val, mesh_shape=mesh_shape, symmetry=symmetry, ref_axis_pos=ref_axis_pos),
+                promotes_inputs=promotes,
+                promotes_outputs=["mesh"],
+            )
         else:
-            names = ["taper", "scale_x", "sweep", "shear_x", "stretch", "shear_y", "dihedral", "shear_z", "rotate"]
+            promotes = []
+
         for j in np.arange(len(names) - 1):
             self.connect(names[j] + ".mesh", names[j + 1] + ".in_mesh")

@@ -22,11 +22,11 @@ def measure_angles(mesh, ref_axis_pos=0.25):
     return theta_x
 
 
-def measure_twist(mesh):
+def measure_twist(mesh, ref_axis_pos=0.25):
     xaxis = np.array([1, 0, 0])
     te = mesh[-1]
     le = mesh[0]
-    quarter_chord = 0.25 * te + 0.75 * le
+    quarter_chord = ref_axis_pos * te + (1 - ref_axis_pos) * le
     dz_qc = quarter_chord[:-1, 2] - quarter_chord[1:, 2]
     dy_qc = quarter_chord[:-1, 1] - quarter_chord[1:, 1]
     theta_x = np.arctan(dz_qc / dy_qc)
