@@ -125,9 +125,19 @@ class GeometryMesh(om.Group):
             promotes = ["span"]
             val = surface["span"]
             names.append("stretch")
+            te = mesh[-1]
+            le = mesh[0]
+            ref_axis = ref_axis_pos * te + (1 - ref_axis_pos) * le
+            spanwise_order = np.sign(ref_axis[-1, 1] - ref_axis[0, 1])
             self.add_subsystem(
                 "stretch",
-                Stretch(val=val, mesh_shape=mesh_shape, symmetry=symmetry, ref_axis_pos=ref_axis_pos),
+                Stretch(
+                    val=val,
+                    mesh_shape=mesh_shape,
+                    symmetry=symmetry,
+                    ref_axis_pos=ref_axis_pos,
+                    spanwise_order=spanwise_order,
+                ),
                 promotes_inputs=promotes,
             )
 
@@ -175,18 +185,16 @@ class GeometryMesh(om.Group):
         val = np.zeros(ny)
         names.append("shear_z")
         if "zshear_cp" in surface:
-            promotes = ["zshear"]
+            promotes_zshear = ["zshear"]
         else:
-            promotes = []
-
-        self.add_subsystem(
-            "shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes, promotes_outputs=["mesh"]
-        )
+            promotes_zshear = []
 
         # 9. Rotate
 
         if "twist_cp" in surface:
             promotes = ["twist"]
+            self.add_subsystem("shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes_zshear)
+            names.append("rotate")
             self.add_subsystem(
                 "rotate",
                 Rotate(val=val, mesh_shape=mesh_shape, symmetry=symmetry, ref_axis_pos=ref_axis_pos),
@@ -194,7 +202,12 @@ class GeometryMesh(om.Group):
                 promotes_outputs=["mesh"],
             )
         else:
-            promotes = []
+            self.add_subsystem(
+                "shear_z",
+                ShearZ(val=val, mesh_shape=mesh_shape),
+                promotes_inputs=promotes_zshear,
+                promotes_outputs=["mesh"],
+            )
 
         for j in np.arange(len(names) - 1):
             self.connect(names[j] + ".mesh", names[j + 1] + ".in_mesh")

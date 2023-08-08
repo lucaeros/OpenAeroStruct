@@ -272,6 +272,27 @@ class Test(unittest.TestCase):
         check = prob.check_partials(compact_print=True, abs_err_tol=1e-5, rel_err_tol=1e-5)
         assert_check_partials(check, atol=1e-6, rtol=1e-6)
 
+    def test_stretch_spanwise_order(self):
+        symmetry = True
+        mesh = get_mesh(symmetry)
+        mesh[:, :, 1] *= -1
+
+        prob = om.Problem()
+        group = prob.model
+
+        val = self.rng.random(1)
+        ref_axis_pos = self.rng.random(1)
+
+        comp = Stretch(val=val, mesh_shape=mesh.shape, symmetry=symmetry, ref_axis_pos=ref_axis_pos, spanwise_order=-1)
+        group.add_subsystem("comp", comp)
+
+        prob.setup()
+
+        prob["comp.in_mesh"] = mesh
+        prob.run_model()
+        check = prob.check_partials(compact_print=True, abs_err_tol=1e-5, rel_err_tol=1e-5)
+        assert_check_partials(check, atol=1e-6, rtol=1e-6)
+
     def test_sheary(self):
         symmetry = False
         mesh = get_mesh(symmetry)

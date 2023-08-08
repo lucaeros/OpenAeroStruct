@@ -694,10 +694,16 @@ class Stretch(om.ExplicitComponent):
             default=0.25,
             desc="Fraction of the chord that is use as the reference axis line",
         )
+        self.options.declare(
+            "spanwise_order",
+            default=1.0,
+            desc="1.0 if mesh has y increasing spanwise, -1.0 if opposite",
+        )
 
     def setup(self):
         mesh_shape = self.options["mesh_shape"]
         val = self.options["val"]
+        self.spanwise_order = self.options["spanwise_order"]
         self.ref_axis_pos = self.options["ref_axis_pos"]
 
         self.add_input("span", val=val, units="m")
@@ -754,7 +760,7 @@ class Stretch(om.ExplicitComponent):
 
         # Compute the previous span and determine the scalar needed to reach the
         # desired span
-        prev_span = ref_axis[-1, 1] - ref_axis[0, 1]
+        prev_span = self.spanwise_order * (ref_axis[-1, 1] - ref_axis[0, 1])
         s = ref_axis[:, 1] / prev_span
 
         outputs["mesh"][:] = mesh
@@ -778,10 +784,10 @@ class Stretch(om.ExplicitComponent):
 
         # Compute the previous span and determine the scalar needed to reach the
         # desired span
-        prev_span = ref_axis[-1, 1] - ref_axis[0, 1]
+        prev_span = self.spanwise_order * (ref_axis[-1, 1] - ref_axis[0, 1])
         s = ref_axis[:, 1] / prev_span
 
-        d_prev_span = -ref_axis[:, 1] / prev_span**2
+        d_prev_span = -self.spanwise_order * ref_axis[:, 1] / prev_span**2
         d_prev_span_qc0 = np.zeros((ny,))
         d_prev_span_qc1 = np.zeros((ny,))
         d_prev_span_qc0[0] = d_prev_span_qc1[-1] = 1.0 / prev_span
