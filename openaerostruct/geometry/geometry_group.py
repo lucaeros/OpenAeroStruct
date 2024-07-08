@@ -42,10 +42,6 @@ class Geometry(om.Group):
                 # Add bspline components for active bspline geometric variables.
                 x_interp = np.linspace(0.0, 1.0, int(ny - 1))
 
-                #if mesh is sin spanwise
-                s_interp = np.linspace(0.,1., int(ny-1))
-                x_interp = 2/np.pi*np.arcsin(s_interp)
-
                 comp = self.add_subsystem(
                     "t_over_c_bsp",
                     om.SplineComp(
@@ -90,7 +86,7 @@ class Geometry(om.Group):
                 comp = self.add_subsystem(
                     "twist_bsp",
                     om.SplineComp(
-                        method="akima",x_interp_val=s_interp, x_cp_val=s_cp, 
+                        method="cubic",x_interp_val=s_interp, x_cp_val=s_cp, 
                         #interp_options={"order": min(n_cp, 4)}
                     ),
                     promotes_inputs=["twist_cp"],
@@ -115,7 +111,7 @@ class Geometry(om.Group):
                 comp = self.add_subsystem(
                     "twist_bsp",
                     om.SplineComp(
-                        method="akima",x_interp_val=s_interp, x_cp_val=s_cp, 
+                        method="cubic",x_interp_val=s_interp, x_cp_val=s_cp, 
                         #interp_options={"order": min(n_cp, 4)}
                     ),
                     promotes_inputs=["twist_cp"],
@@ -142,7 +138,7 @@ class Geometry(om.Group):
                 comp = self.add_subsystem(
                     "chord_bsp",
                     om.SplineComp(
-                       method="akima",x_interp_val=s_interp, x_cp_val=s_cp, 
+                       method="cubic",x_interp_val=s_interp, x_cp_val=s_cp, 
                        #interp_options={"order": min(n_cp, 4)}
                     ),
                     promotes_inputs=["chord_cp"],
@@ -157,10 +153,6 @@ class Geometry(om.Group):
                 n_cp = len(surface["t_over_c_cp"])
                 # Add bspline components for active bspline geometric variables.
                 x_interp = np.linspace(0.0, 1.0, int(ny - 1))
-
-                #if mesh is sin spanwise
-                s_interp = np.linspace(0.,1., int(ny-1))
-                x_interp = 2/np.pi*np.arcsin(s_interp)
 
                 comp = self.add_subsystem(
                     "t_over_c_bsp",
@@ -188,7 +180,7 @@ class Geometry(om.Group):
                 comp = self.add_subsystem(
                     "xshear_bsp",
                     om.SplineComp(
-                        method="akima",x_interp_val=s_interp, x_cp_val=s_cp, 
+                        method="cubic",x_interp_val=s_interp, x_cp_val=s_cp, 
                         #interp_options={"order": min(n_cp, 4)}
                     ),
                     promotes_inputs=["xshear_cp"],
@@ -203,10 +195,6 @@ class Geometry(om.Group):
                 n_cp = len(surface["yshear_cp"])
                 # Add bspline components for active bspline geometric variables.
                 x_interp = np.linspace(0.0, 1.0, int(ny))
-
-                #if mesh is sin spanwise
-                s_interp = np.linspace(0.,1., int(ny))
-                x_interp = 2/np.pi*np.arcsin(s_interp)
 
                 comp = self.add_subsystem(
                     "yshear_bsp",
@@ -225,12 +213,7 @@ class Geometry(om.Group):
                 n_cp = len(surface["zshear_cp"])
                 # Add bspline components for active bspline geometric variables.
                 x_interp = np.linspace(0.0, 1.0, int(ny))
-
-                #if mesh is sin spanwise
-                s_interp = np.linspace(0.,1., int(ny))
-                x_interp = 2/np.pi*np.arcsin(s_interp)
-
-
+                
                 comp = self.add_subsystem(
                     "zshear_bsp",
                     om.SplineComp(
@@ -285,7 +268,7 @@ class Geometry(om.Group):
                 comp = self.add_subsystem(
                     "angles_bsp",
                     om.SplineComp(
-                        method="akima",x_interp_val=s_interp, x_cp_val=s_cp, 
+                        method="cubic",x_interp_val=s_interp, x_cp_val=s_cp, 
                         #interp_options={"order": min(n_cp, 4)}
                     ),
                     promotes_inputs=["angles_cp"],
