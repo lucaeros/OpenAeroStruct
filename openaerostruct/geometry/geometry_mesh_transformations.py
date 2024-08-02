@@ -1,6 +1,7 @@
 """ A set of components that manipulate geometry mesh
     based on high-level design parameters. """
 
+from re import S
 import numpy as np
 import jax.numpy as jnp
 from jax import grad, jacfwd, jacrev
