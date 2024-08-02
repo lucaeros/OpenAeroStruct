@@ -5,9 +5,8 @@ from re import S
 import numpy as np
 import jax.numpy as jnp
 from jax import grad, jacfwd, jacrev, jit
-from jax.config import config
-
-config.update("jax_enable_x64", True)
+import jax
+jax.config.update("jax_enable_x64", True)
 import openmdao.api as om
 
 
