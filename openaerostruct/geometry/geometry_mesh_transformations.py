@@ -5,8 +5,6 @@ from re import S
 import numpy as np
 import jax.numpy as jnp
 from jax import grad, jacfwd, jacrev
-from jax.config import config
-config.update("jax_enable_x64", True)
 import openmdao.api as om
 
 
@@ -21,25 +19,25 @@ def measure_angles(mesh):
     return theta_x
 
 
-def apply_angles(mesh, angles, mesh_shape):
+def apply_angles(mesh, angles, mesh_shape, ref_axis_pos):
 	te = mesh.at[-1].get()
 	le = mesh.at[0].get()
 	s0 = mesh_shape[0]
 	s1 = mesh_shape[1]
-	quarter_chord = 0.25 * te + 0.75 * le
-	vect = quarter_chord.at[:-1, :].get() - quarter_chord.at[1:, :].get()
+	ref_axis =  ref_axis_pos* te + (1-ref_axis_pos) * le
+	vect = ref_axis.at[:-1, :].get() - ref_axis.at[1:, :].get()
 	#points = jnp.array([[mesh.at[i,j,:].get()-quarter_chord.at[j,:].get() for j in range(s1-1)] for i in range(s0)])
-	new_quarters = jnp.zeros(quarter_chord.shape)
-	new_quarters = new_quarters.at[s1-1, :].set(quarter_chord.at[s1-1, :].get())
+	new_ref_axis = jnp.zeros(ref_axis.shape)
+	new_ref_axis = new_ref_axis.at[s1-1, :].set(new_ref_axis.at[s1-1, :].get())
 	#norms = jnp.array([jnp.sqrt(vect.at[j, 1].get()**2+vect.at[j,2].get()**2) for j in range(s1-1)])
 	new_mesh = jnp.zeros(mesh_shape)
 	new_mesh = new_mesh.at[:,-1,:].set(mesh.at[:,-1,:].get())
 	for j in reversed(range(s1-1)):
 		norms = jnp.sqrt(vect.at[j, 1].get()**2+vect.at[j,2].get()**2)
 		for i in range(s0):
-			points = mesh.at[i,j,:].get()-quarter_chord.at[j,:].get()
-			new_quarters = new_quarters.at[j, :].set(new_quarters.at[j+1, :].get() + jnp.array([vect.at[j,0].get(),norms*jnp.cos(angles.at[j].get()*np.pi/180), norms*jnp.sin(angles.at[j].get()*np.pi/180)]))
-			new_mesh = new_mesh.at[i, j,:].set(new_quarters.at[j,:].get()+points)
+			points = mesh.at[i,j,:].get()-ref_axis.at[j,:].get()
+			new_ref_axis = new_ref_axis.at[j, :].set(new_ref_axis.at[j+1, :].get() + jnp.array([vect.at[j,0].get(),norms*jnp.cos(angles.at[j].get()*np.pi/180), norms*jnp.sin(angles.at[j].get()*np.pi/180)]))
+			new_mesh = new_mesh.at[i, j,:].set(new_ref_axis.at[j,:].get()+points)
 	return new_mesh
 
 
@@ -51,6 +49,11 @@ class Angles(om.ExplicitComponent):
         #self.options.declare("mesh")
         self.options.declare("mesh_shape", desc="mesh")
         self.options.declare("val", desc="Initial value for angles dihedral")
+        self.options.declare(
+            "ref_axis_pos",
+            default=0.25,
+            desc="Fraction of the chord to use as the reference axis",
+        )
 
     def setup(self):
         mesh_shape = self.options["mesh_shape"]
@@ -65,17 +68,17 @@ class Angles(om.ExplicitComponent):
         in_mesh = jnp.array(inputs["in_mesh"])
         angles = jnp.array(inputs["angles"])
         mesh_shape = self.options["mesh_shape"]
-        outputs["mesh"] = apply_angles(in_mesh,angles, mesh_shape)
+        outputs["mesh"] = apply_angles(in_mesh,angles, mesh_shape, self.options["ref_axis_pos"])
 
     def compute_partials(self, inputs, J):
         in_mesh = jnp.array(inputs["in_mesh"])
         angles = jnp.array(inputs["angles"])
         mesh_shape = jnp.array(self.options["mesh_shape"])
         p = np.prod(mesh_shape)
-        J1 = jacfwd(apply_angles, 0)(in_mesh, angles, mesh_shape)
-        J2 = jacfwd(apply_angles, 1)(in_mesh, angles, mesh_shape)
+        J1 = jacfwd(apply_angles, 0)(in_mesh, angles, mesh_shape, self.options["ref_axis_pos"])
+        J2 = jacfwd(apply_angles, 1)(in_mesh, angles, mesh_shape, self.options["ref_axis_pos"])
         J["mesh","in_mesh"] = J1.reshape((p,p))
-        J["mesh","angles"] = J2.reshape((p,mesh_shape[1]-1))
+        J["mesh","angles"] = J2.reshape((p,mesh_shape[1]))
 
 
 class Taper(om.ExplicitComponent):

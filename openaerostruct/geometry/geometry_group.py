@@ -167,6 +167,25 @@ class Geometry(om.Group):
                 if surface.get("zshear_cp_dv", True):
                     self.set_input_defaults("zshear_cp", val=surface["zshear_cp"], units="m")
 
+            if "angles_cp" in surface.keys():
+                n_cp = len(surface["angles_cp"])
+                # Add bspline components for active bspline geometric variables.
+                #x_interp = get_normalized_span_coords(surface)
+                x_interp = np.linspace(0,1,num =surface["mesh"].shape[1])
+                print(x_interp)
+                comp = self.add_subsystem(
+                    "angles_bsp",
+                    om.SplineComp(
+                        method="bsplines", x_interp_val=x_interp, num_cp=n_cp, interp_options={"order": min(n_cp, 4)}
+                    ),
+                    promotes_inputs=["angles_cp"],
+                    promotes_outputs=["angles"],
+                )
+                comp.add_spline(y_cp_name="angles_cp", y_interp_name="angles")
+                bsp_inputs.append("angles")
+                if surface.get("angles_cp_dv", True):
+                    self.set_input_defaults("angles_cp", val=surface["angles_cp"])
+
             if "sweep" in surface.keys():
                 bsp_inputs.append("sweep")
                 if surface.get("sweep_dv", True):
@@ -186,18 +205,6 @@ class Geometry(om.Group):
                 bsp_inputs.append("taper")
                 if surface.get("taper_dv", True):
                     self.set_input_defaults("taper", val=surface["taper"])
-
-            if "angles" in surface.keys():
-                bsp_inputs.append("angles")
-                self.set_input_defaults("angles", val=surface["angles"])
-
-
-
-            if "angles" in surface.keys():
-                bsp_inputs.append("angles")
-                self.set_input_defaults("angles", val=surface["angles"])
-
-
 
             self.add_subsystem(
                 "mesh", GeometryMesh(surface=surface), promotes_inputs=bsp_inputs, promotes_outputs=["mesh"]
