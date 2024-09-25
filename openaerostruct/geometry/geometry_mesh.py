@@ -14,6 +14,7 @@ from openaerostruct.geometry.geometry_mesh_transformations import (
     Dihedral,
     ShearZ,
     Rotate,
+    Angles_old,
     Angles,
     measure_angles,
 )
@@ -71,6 +72,7 @@ class GeometryMesh(om.Group):
         self.rotate_x = True
 
         # 1. Taper
+        names = []
 
         if "taper" in surface:
             val = surface["taper"]
@@ -169,19 +171,22 @@ class GeometryMesh(om.Group):
         else:
             promotes = []
 
-        self.add_subsystem("shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
-
+        if "angles_cp" not in surface and "twist_cp" not in surface:
+            self.add_subsystem("shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes,promotes_outputs=["mesh"])
+            names = ["taper", "scale_x", "sweep", "shear_x", "stretch", "shear_y", "dihedral", "shear_z"]
+        else:
+            self.add_subsystem("shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
+            names = ["taper", "scale_x", "sweep", "shear_x", "stretch", "shear_y", "dihedral", "shear_z", "angles", "rotate"]
+            
         if "angles_cp" in surface:
             promotes = ["angles"]
             val = measure_angles(mesh) 
+            self.add_subsystem(
+            "angles",
+            Angles_old(mesh_shape=mesh_shape, val = np.zeros(mesh_shape[1]-1), ref_axis_pos=ref_axis_pos),
+            promotes_inputs=promotes)
         else:
             promotes = []
-
-        self.add_subsystem(
-            "angles",
-            Angles(mesh_shape=mesh_shape, val = np.zeros(mesh_shape[1]), ref_axis_pos=ref_axis_pos),
-            promotes_inputs=promotes
-        )
 
 
         # 9. Rotate
@@ -189,18 +194,16 @@ class GeometryMesh(om.Group):
         val = np.zeros(ny)
         if "twist_cp" in surface:
             promotes = ["twist"]
-        else:
-            val = np.zeros(ny)
-            promotes = []
-
-        self.add_subsystem(
+            self.add_subsystem(
             "rotate",
             Rotate(val=val, mesh_shape=mesh_shape, symmetry=symmetry, ref_axis_pos=ref_axis_pos),
             promotes_inputs=promotes,
             promotes_outputs=["mesh"],
-        )
-
-        names = ["taper", "scale_x", "sweep", "shear_x", "stretch", "shear_y", "dihedral", "shear_z", "angles", "rotate"]
+            )
+        else:
+            val = np.zeros(ny)
+            promotes = []
+        
 
         for j in np.arange(len(names) - 1):
             self.connect(names[j] + ".mesh", names[j + 1] + ".in_mesh")

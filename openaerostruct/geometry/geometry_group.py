@@ -68,6 +68,7 @@ class Geometry(om.Group):
                 n_cp = len(surface["twist_cp"])
                 # Add bspline components for active bspline geometric variables.
                 x_interp = get_normalized_span_coords(surface)
+                x_interp = np.linspace(0,1,num =surface["mesh"].shape[1])
                 comp = self.add_subsystem(
                     "twist_bsp",
                     om.SplineComp(
@@ -87,6 +88,8 @@ class Geometry(om.Group):
                 n_cp = len(surface["chord_cp"])
                 # Add bspline components for active bspline geometric variables.
                 x_interp = get_normalized_span_coords(surface)
+                x_interp = np.linspace(0,1,num =surface["mesh"].shape[1])
+                #x_interp = np.linspace(0,1, num = surface["mesh"].shape[1])
                 comp = self.add_subsystem(
                     "chord_bsp",
                     om.SplineComp(
@@ -120,6 +123,7 @@ class Geometry(om.Group):
                 n_cp = len(surface["xshear_cp"])
                 # Add bspline components for active bspline geometric variables.
                 x_interp = get_normalized_span_coords(surface)
+                x_interp = np.linspace(0,1,num =surface["mesh"].shape[1])
                 comp = self.add_subsystem(
                     "xshear_bsp",
                     om.SplineComp(
@@ -154,6 +158,7 @@ class Geometry(om.Group):
                 n_cp = len(surface["zshear_cp"])
                 # Add bspline components for active bspline geometric variables.
                 x_interp = get_normalized_span_coords(surface)
+                x_interp = np.linspace(0,1,num =surface["mesh"].shape[1])
                 comp = self.add_subsystem(
                     "zshear_bsp",
                     om.SplineComp(
@@ -170,9 +175,9 @@ class Geometry(om.Group):
             if "angles_cp" in surface.keys():
                 n_cp = len(surface["angles_cp"])
                 # Add bspline components for active bspline geometric variables.
-                #x_interp = get_normalized_span_coords(surface)
-                x_interp = np.linspace(0,1,num =surface["mesh"].shape[1])
-                print(x_interp)
+                x_interp = get_normalized_span_coords(surface)[1:]
+                x_interp = np.linspace(0,1,num =surface["mesh"].shape[1])[1:]
+                #print(x_interp)
                 comp = self.add_subsystem(
                     "angles_bsp",
                     om.SplineComp(
