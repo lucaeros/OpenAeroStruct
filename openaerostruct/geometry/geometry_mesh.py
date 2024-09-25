@@ -183,7 +183,7 @@ class GeometryMesh(om.Group):
         if "angles_cp" in surface:
             promotes = ["angles"]
             val = measure_angles(mesh)
-            names = "angles"
+            names.append("angles")
         else:
             promotes = []
 
