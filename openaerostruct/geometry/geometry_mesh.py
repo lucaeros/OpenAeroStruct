@@ -72,7 +72,7 @@ class GeometryMesh(om.Group):
         self.rotate_x = True
 
         # 1. Taper
-        names = []
+        names = ["taper"]
 
         if "taper" in surface:
             val = surface["taper"]
@@ -90,6 +90,7 @@ class GeometryMesh(om.Group):
         val = np.ones(ny)
         if "chord_cp" in surface:
             promotes = ["chord"]
+            names.append("scale_x")
         else:
             promotes = []
 
@@ -104,6 +105,7 @@ class GeometryMesh(om.Group):
         if "sweep" in surface:
             val = surface["sweep"]
             promotes = ["sweep"]
+            names.append("sweep")
         else:
             val = 0.0
             promotes = []
@@ -115,6 +117,7 @@ class GeometryMesh(om.Group):
         val = np.zeros(ny)
         if "xshear_cp" in surface:
             promotes = ["xshear"]
+            names.append("shear_x")
         else:
             promotes = []
 
@@ -125,6 +128,7 @@ class GeometryMesh(om.Group):
         if "span" in surface:
             promotes = ["span"]
             val = surface["span"]
+            names.append("stretch")
         else:
             # Compute span. We need .real to make span to avoid OpenMDAO warnings.
             ref_axis = ref_axis_pos * mesh[-1, :, :] + (1 - ref_axis_pos) * mesh[0, :, :]
@@ -145,6 +149,7 @@ class GeometryMesh(om.Group):
         val = np.zeros(ny)
         if "yshear_cp" in surface:
             promotes = ["yshear"]
+            names.append("shear_y")
         else:
             promotes = []
 
@@ -155,6 +160,7 @@ class GeometryMesh(om.Group):
         if "dihedral" in surface:
             val = surface["dihedral"]
             promotes = ["dihedral"]
+            names.append("dihedral")
         else:
             val = 0.0
             promotes = []
@@ -168,42 +174,40 @@ class GeometryMesh(om.Group):
         val = np.zeros(ny)
         if "zshear_cp" in surface:
             promotes = ["zshear"]
+            names.append("shear_z")
         else:
             promotes = []
 
-        if "angles_cp" not in surface and "twist_cp" not in surface:
-            self.add_subsystem("shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes,promotes_outputs=["mesh"])
-            names = ["taper", "scale_x", "sweep", "shear_x", "stretch", "shear_y", "dihedral", "shear_z"]
-        else:
-            self.add_subsystem("shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
-            names = ["taper", "scale_x", "sweep", "shear_x", "stretch", "shear_y", "dihedral", "shear_z", "angles", "rotate"]
+        self.add_subsystem("shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
             
         if "angles_cp" in surface:
             promotes = ["angles"]
-            val = measure_angles(mesh) 
-            self.add_subsystem(
-            "angles",
-            Angles_old(mesh_shape=mesh_shape, val = np.zeros(mesh_shape[1]-1), ref_axis_pos=ref_axis_pos),
-            promotes_inputs=promotes)
+            val = measure_angles(mesh)
+            names = "angles"
         else:
             promotes = []
 
+        self.add_subsystem(
+            "angles",
+            Angles_old(mesh_shape=mesh_shape, val = np.zeros(mesh_shape[1]-1), ref_axis_pos=ref_axis_pos),
+            promotes_inputs=promotes)
 
         # 9. Rotate
 
         val = np.zeros(ny)
         if "twist_cp" in surface:
             promotes = ["twist"]
-            self.add_subsystem(
-            "rotate",
-            Rotate(val=val, mesh_shape=mesh_shape, symmetry=symmetry, ref_axis_pos=ref_axis_pos),
-            promotes_inputs=promotes,
-            promotes_outputs=["mesh"],
-            )
+            names.append("rotate")
         else:
             val = np.zeros(ny)
             promotes = []
-        
 
-        for j in np.arange(len(names) - 1):
-            self.connect(names[j] + ".mesh", names[j + 1] + ".in_mesh")
+        self.add_subsystem(
+            "rotate",
+            Rotate(val=val, mesh_shape=mesh_shape, symmetry=symmetry, ref_axis_pos=ref_axis_pos),
+            promotes_inputs=promotes)
+        
+        self.promotes(names[-1], outputs=["mesh"])
+        if len(names) > 1:
+            for j in np.arange(len(names) - 1):
+                self.connect(names[j] + ".mesh", names[j + 1] + ".in_mesh")
