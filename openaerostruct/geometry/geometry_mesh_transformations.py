@@ -40,6 +40,38 @@ def apply_angles(mesh, angles, mesh_shape, ref_axis_pos):
 			new_mesh = new_mesh.at[i, j,:].set(new_ref_axis.at[j,:].get()+points)
 	return new_mesh
 
+class Angles2(om.ExplicitComponent):
+    def initialize(self):
+        """
+        Declare options.
+        """
+        #self.options.declare("mesh")
+        self.options.declare("mesh_shape", desc="mesh")
+        self.options.declare("val", desc="Initial value for angles dihedral")
+        self.options.declare(
+            "ref_axis_pos",
+            default=0.25,
+            desc="Fraction of the chord to use as the reference axis",
+        )
+
+    def setup(self):
+        mesh_shape = self.options["mesh_shape"]
+        val = self.options["val"]
+        self.add_input("in_mesh", val = np.zeros(mesh_shape))
+        self.add_input("angles", val = val)
+        self.add_output("mesh", val= np.zeros(mesh_shape))
+        self.declare_partials(of = "*", wrt = "*", method = "cs")
+
+    def compute(self, inputs, outputs):
+        mesh_shape = self.options["mesh_shape"]
+        in_mesh = inputs["in_mesh"]
+        mesh = in_mesh.copy()
+        for k in reversed(range(0, mesh_shape[1]-1)):
+                vect = in_mesh[:,k, 1:] - in_mesh[:, k+1, 1:]
+                n = np.linalg.norm(vect, axis = 1)
+                mesh[:, k, 1] = np.full(mesh.shape[0], -n*np.cos(inputs["angles"][k]*np.pi/180)) + mesh[:, k+1, 1]
+                mesh[:, k, 2] = np.full(mesh.shape[0], n*np.sin(inputs["angles"][k]*np.pi/180)) + mesh[:, k+1, 2]
+        outputs["mesh"] = mesh
 
 class Angles(om.ExplicitComponent):
     def initialize(self):
@@ -65,15 +97,13 @@ class Angles(om.ExplicitComponent):
 
     def compute(self, inputs, outputs):
         mesh_shape = self.options["mesh_shape"]
-        mesh = inputs["in_mesh"].copy()
-        for k in reversed(range(0, mesh_shape[1]-2)):
-            for i in range(mesh_shape[0]):
-                vect = mesh[i,k, :] - mesh[i, k+1, :]
-                n = np.sqrt(vect[1]**2)
-                mesh[i, k, 1] = -n*np.cos(inputs["angles"][k]*np.pi/180) + mesh[i, k+1, 1]
-                mesh[i, k, 2] = -n*np.sin(inputs["angles"][k]*np.pi/180) + mesh[i, k+1, 2]
-                #mesh[i, k, 1] = np.sks_local_lift_0.KSum(np.multiply(di[i, k:, 1],np.cos(inputs["angles"][k:]*np.pi/180)))
-                #mesh[i, k, 2] = np.sum(np.multiply(di[i, k:, 2],np.sin(inputs["angles"][k:]*np.pi/180)))
+        in_mesh = inputs["in_mesh"]
+        mesh = in_mesh.copy()
+        vect = in_mesh[:,:-1, 1:] - in_mesh[:,1:, 1:]
+        n = np.linalg.norm(vect[:, :, :], axis = 2)
+        for k in reversed(range(0, mesh_shape[1]-1)):
+            mesh[:, k, 1] = -n[:, k]*np.cos(inputs["angles"][k]*np.pi/180) + mesh[:, k+1, 1]
+            mesh[:, k, 2] = n[:, k]*np.sin(inputs["angles"][k]*np.pi/180) + mesh[:, k+1, 2]
         outputs["mesh"] = mesh
 
 

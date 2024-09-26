@@ -181,7 +181,7 @@ class GeometryMesh(om.Group):
             names.append("angles")
             self.add_subsystem(
             "angles",
-            Angles_old(mesh_shape=mesh_shape, val = np.zeros(mesh_shape[1]-1), ref_axis_pos=ref_axis_pos),
+            Angles(mesh_shape=mesh_shape, val = np.zeros(mesh_shape[1]-1), ref_axis_pos=ref_axis_pos),
             promotes_inputs=promotes)
         else:
             promotes = []

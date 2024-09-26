@@ -4,7 +4,6 @@ import openmdao.api as om
 from openaerostruct.utils.check_surface_dict import check_surface_dict_keys
 from openaerostruct.utils.interpolation import get_normalized_span_coords
 
-
 class Geometry(om.Group):
     """
     Group that contains all components needed for any type of OAS problem.
