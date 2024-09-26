@@ -91,14 +91,14 @@ class GeometryMesh(om.Group):
         if "chord_cp" in surface:
             promotes = ["chord"]
             names.append("scale_x")
+            self.add_subsystem(
+            "scale_x",
+            ScaleX(val=val, mesh_shape=mesh_shape, ref_axis_pos=ref_axis_pos),
+            promotes_inputs=promotes)
         else:
             promotes = []
 
-        self.add_subsystem(
-            "scale_x",
-            ScaleX(val=val, mesh_shape=mesh_shape, ref_axis_pos=ref_axis_pos),
-            promotes_inputs=promotes,
-        )
+
 
         # 3. Sweep
 
@@ -106,11 +106,12 @@ class GeometryMesh(om.Group):
             val = surface["sweep"]
             promotes = ["sweep"]
             names.append("sweep")
+            self.add_subsystem("sweep", Sweep(val=val, mesh_shape=mesh_shape, symmetry=symmetry), promotes_inputs=promotes)
         else:
             val = 0.0
             promotes = []
 
-        self.add_subsystem("sweep", Sweep(val=val, mesh_shape=mesh_shape, symmetry=symmetry), promotes_inputs=promotes)
+        
 
         # 4. Shear X
 
@@ -118,10 +119,11 @@ class GeometryMesh(om.Group):
         if "xshear_cp" in surface:
             promotes = ["xshear"]
             names.append("shear_x")
+            self.add_subsystem("shear_x", ShearX(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
         else:
             promotes = []
 
-        self.add_subsystem("shear_x", ShearX(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
+        
 
         # 5. Stretch
 
@@ -129,20 +131,11 @@ class GeometryMesh(om.Group):
             promotes = ["span"]
             val = surface["span"]
             names.append("stretch")
-        else:
-            # Compute span. We need .real to make span to avoid OpenMDAO warnings.
-            ref_axis = ref_axis_pos * mesh[-1, :, :] + (1 - ref_axis_pos) * mesh[0, :, :]
-            span = max(ref_axis[:, 1]).real - min(ref_axis[:, 1]).real
-            if symmetry:
-                span *= 2.0
-            val = span
-            promotes = []
-
-        self.add_subsystem(
+            self.add_subsystem(
             "stretch",
             Stretch(val=val, mesh_shape=mesh_shape, symmetry=symmetry, ref_axis_pos=ref_axis_pos),
-            promotes_inputs=promotes,
-        )
+            promotes_inputs=promotes)
+
 
         # 6. Shear Y
 
@@ -150,10 +143,11 @@ class GeometryMesh(om.Group):
         if "yshear_cp" in surface:
             promotes = ["yshear"]
             names.append("shear_y")
+            self.add_subsystem("shear_y", ShearY(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
         else:
             promotes = []
 
-        self.add_subsystem("shear_y", ShearY(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
+        
 
         # 7. Dihedral
 
@@ -161,13 +155,13 @@ class GeometryMesh(om.Group):
             val = surface["dihedral"]
             promotes = ["dihedral"]
             names.append("dihedral")
+            self.add_subsystem(
+            "dihedral", Dihedral(val=val, mesh_shape=mesh_shape, symmetry=symmetry), promotes_inputs=promotes)
         else:
             val = 0.0
             promotes = []
 
-        self.add_subsystem(
-            "dihedral", Dihedral(val=val, mesh_shape=mesh_shape, symmetry=symmetry), promotes_inputs=promotes
-        )
+
 
         # 8. Shear Z
 
@@ -175,22 +169,24 @@ class GeometryMesh(om.Group):
         if "zshear_cp" in surface:
             promotes = ["zshear"]
             names.append("shear_z")
+            self.add_subsystem("shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
         else:
             promotes = []
 
-        self.add_subsystem("shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
+        
             
         if "angles_cp" in surface:
             promotes = ["angles"]
             val = measure_angles(mesh)
             names.append("angles")
-        else:
-            promotes = []
-
-        self.add_subsystem(
+            self.add_subsystem(
             "angles",
             Angles_old(mesh_shape=mesh_shape, val = np.zeros(mesh_shape[1]-1), ref_axis_pos=ref_axis_pos),
             promotes_inputs=promotes)
+        else:
+            promotes = []
+
+
 
         # 9. Rotate
 
@@ -198,14 +194,13 @@ class GeometryMesh(om.Group):
         if "twist_cp" in surface:
             promotes = ["twist"]
             names.append("rotate")
-        else:
-            val = np.zeros(ny)
-            promotes = []
-
-        self.add_subsystem(
+            self.add_subsystem(
             "rotate",
             Rotate(val=val, mesh_shape=mesh_shape, symmetry=symmetry, ref_axis_pos=ref_axis_pos),
             promotes_inputs=promotes)
+        else:
+            val = np.zeros(ny)
+            promotes = []
         
         self.promotes(names[-1], outputs=["mesh"])
         if len(names) > 1:
