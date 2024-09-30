@@ -14,6 +14,8 @@ def check_surface_dict_keys(surface):
 
     # NOTE: make sure this is consistent to the documentation's surface dict page
     keys_implemented = [
+        "billow",
+        "mass_per_area",
         # wing definition
         "name",
         "symmetry",
