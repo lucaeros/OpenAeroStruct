@@ -135,6 +135,8 @@ class GeometryMesh(om.Group):
             "stretch",
             Stretch(val=val, mesh_shape=mesh_shape, symmetry=symmetry, ref_axis_pos=ref_axis_pos),
             promotes_inputs=promotes)
+        else:
+            promotes = []
 
 
         # 6. Shear Y
