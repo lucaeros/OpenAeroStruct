@@ -180,9 +180,9 @@ class GeometryMesh(om.Group):
         if "angles_cp" in surface:
             promotes = ["angles"]
             val = measure_angles(mesh)
-            names.append("angles")
+            names.append("arch")
             self.add_subsystem(
-            "angles",
+            "arch",
             Angles(mesh_shape=mesh_shape, val = np.zeros(mesh_shape[1]-1), ref_axis_pos=ref_axis_pos),
             promotes_inputs=promotes)
         else:

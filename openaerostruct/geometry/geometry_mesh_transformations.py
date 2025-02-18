@@ -93,7 +93,7 @@ class Angles(om.ExplicitComponent):
         self.add_input("in_mesh", val = np.zeros(mesh_shape))
         self.add_input("angles", val = val)
         self.add_output("mesh", val= np.zeros(mesh_shape))
-        self.declare_partials(of = "*", wrt = "*", method = "cs")
+        self.declare_partials(of = "*", wrt = "*", method = "fd")
 
     def compute(self, inputs, outputs):
         mesh_shape = self.options["mesh_shape"]
